@@ -461,7 +461,11 @@ class FootstepsExtractor:
                                   footstep_scaling=footstep_scaling,
                                   time_scaling=time_scaling)
 
-    def retrieve_contacts(self) -> None:
+    def update_footsteps_path(self, updated_footsteps_path: str):
+        self.footsteps_path = updated_footsteps_path
+
+    # TODO: orientation offset ?
+    def retrieve_contacts(self, right_foot_pos_offset = None, left_foot_pos_offset = None) -> None:
         """Retrieve and scale the footsteps of the generated trajectory. Plot original and scaled footsteps."""
 
         # Create the map of contact lists
@@ -496,10 +500,14 @@ class FootstepsExtractor:
         # ===============================
 
         # Retrieve first left contact position
-        ground_l_foot_position = [l_contacts[0]["2D_pos"][0], l_contacts[0]["2D_pos"][1], 0]
-        ground_l_foot_position_gazebo = [0, 0.08, 0]
-        ground_l_foot_position_offset = np.array(ground_l_foot_position_gazebo) - np.array(ground_l_foot_position)
-        ground_l_foot_position += np.array(ground_l_foot_position_offset)
+        original_ground_l_foot_position = [l_contacts[0]["2D_pos"][0], l_contacts[0]["2D_pos"][1], 0]
+        if left_foot_pos_offset is not None:
+            ground_l_foot_position = left_foot_pos_offset
+        else:
+            ground_l_foot_position = original_ground_l_foot_position
+
+        # print("ground_l_foot_position:")
+        # print(ground_l_foot_position)
 
         # Retrieve first left contact orientation
         l_foot_yaw = l_contacts[0]["2D_orient"]
@@ -509,10 +517,14 @@ class FootstepsExtractor:
         l_deactivation_time = self.time_scaling * (l_contacts[0]["deactivation_time"])
 
         # Retrieve first right contact position
-        ground_r_foot_position = [r_contacts[0]["2D_pos"][0], r_contacts[0]["2D_pos"][1], 0]
-        ground_r_foot_position_gazebo = [0, -0.08, 0]
-        ground_r_foot_position_offset = np.array(ground_r_foot_position_gazebo) - np.array(ground_r_foot_position)
-        ground_r_foot_position += np.array(ground_r_foot_position_offset)
+        original_ground_r_foot_position = [r_contacts[0]["2D_pos"][0], r_contacts[0]["2D_pos"][1], 0]
+        if right_foot_pos_offset is not None:
+            ground_r_foot_position = right_foot_pos_offset
+        else:
+            ground_r_foot_position = original_ground_r_foot_position
+
+        # print("ground_r_foot_position:")
+        # print(ground_r_foot_position)
 
         # Retrieve first right contact orientation
         r_foot_yaw = r_contacts[0]["2D_orient"]
@@ -554,7 +566,11 @@ class FootstepsExtractor:
 
             # Retrieve position
             ground_l_foot_position = [contact["2D_pos"][0], contact["2D_pos"][1], 0]
-            ground_l_foot_position += np.array(ground_l_foot_position_offset)
+            if left_foot_pos_offset is not None:
+                ground_l_foot_position += (left_foot_pos_offset - original_ground_l_foot_position) # TODO check
+
+            # print("ground_l_foot_position:")
+            # print(ground_l_foot_position)
 
             # Update unscaled contact list and storage for plotting
             unscaled_l_contacts.append(ground_l_foot_position)
@@ -575,7 +591,7 @@ class FootstepsExtractor:
             scaled_distance = self.footstep_scaling * distance
 
             # Compute the next contact as the previous contact plus the scaled step
-            ground_l_foot_position = prev_contact + [scaled_distance[0], scaled_distance[1], 0]
+            ground_l_foot_position = prev_contact + np.array([scaled_distance[0], scaled_distance[1], 0])
 
             # Update the variables keeping track of the previous scaled and unscaled contacts
             prev_unscaled_contact = [unscaled_contact[0], unscaled_contact[1], 0]
@@ -619,7 +635,11 @@ class FootstepsExtractor:
 
             # Retrieve position
             ground_r_foot_position = [contact["2D_pos"][0], contact["2D_pos"][1], 0]
-            ground_r_foot_position += np.array(ground_r_foot_position_offset)
+            if right_foot_pos_offset is not None:
+                ground_r_foot_position += (right_foot_pos_offset - original_ground_r_foot_position) # TODO check
+
+            # print("ground_r_foot_position:")
+            # print(ground_r_foot_position)
 
             # Update unscaled contact list and storage for plotting
             unscaled_r_contacts.append(ground_r_foot_position)
@@ -640,7 +660,7 @@ class FootstepsExtractor:
             scaled_distance = self.footstep_scaling * distance
 
             # Compute the next contact as the previous contact plus the scaled step
-            ground_r_foot_position = prev_contact + [scaled_distance[0], scaled_distance[1], 0]
+            ground_r_foot_position = prev_contact + np.array([scaled_distance[0], scaled_distance[1], 0])
 
             # Update the variables keeping track of the previous scaled and unscaled contacts
             prev_unscaled_contact = [unscaled_contact[0], unscaled_contact[1], 0]
@@ -713,6 +733,9 @@ class PosturalExtractor:
         return PosturalExtractor(posturals_path=posturals_path,
                                  time_scaling=time_scaling,
                                  shoulder_offset=shoulder_offset)
+
+    def update_posturals_path(self, updated_posturals_path: str):
+        self.posturals_path = updated_posturals_path
 
     def retrieve_joint_references(self, joints_list: List) -> None:
         """Retrieve postural references at the desired frequency from the generated trajectory."""
@@ -1492,11 +1515,17 @@ class TrajectoryController:
         assert self.kindyn_des_desc.kindyn.set_robot_state(world_H_base, self.joints_values_des, base_twist, self.joints_velocities_des, world_gravity())
         assert self.kindyn_meas_desc.kindyn.set_robot_state(world_H_base, self.joints_values, base_twist, self.joints_velocities, world_gravity())
 
-    def configure_planners(self) -> None:
+    def configure_planners(self, initial_com = None) -> None:
         """Setup DCM and swing foot planners."""
 
+        if initial_com is None:
+            initial_com = self.kindyn_des_desc.kindyn.get_center_of_mass_position()
+
+        # print("initial_com:")
+        # print(initial_com)
+
         self.trajectory_optimization.configure(contact_phase_list=self.footsteps_extractor.contact_phase_list,
-                                               initial_com=self.kindyn_des_desc.kindyn.get_center_of_mass_position(),
+                                               initial_com=initial_com,
                                                dt=self.dt)
 
     def configure_controllers(self, k_zmp: float, k_dcm: float, k_com: float) -> None:
@@ -1616,7 +1645,7 @@ class TrajectoryController:
 
         if idx == 0:
 
-            input("Press enter to start trajectory control (PositionDirect)")
+            # input("Press enter to start trajectory control (PositionDirect)")
 
             # Retrieve the initial time
             initial_time = yarp.now()
