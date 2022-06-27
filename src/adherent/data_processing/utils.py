@@ -183,24 +183,34 @@ def load_retargeted_mocap_from_json(input_file_name: str, initial_frame: int = 0
 def define_frontal_base_direction(robot: str) -> List:
     """Define the robot-specific frontal base direction in the base frame."""
 
-    if robot != "iCubV2_5":
-        raise Exception("Frontal base direction only defined for iCubV2_5.")
+    if robot == "iCubV2_5":
+        # For iCubV2_5, the reversed x axis of the base frame is pointing forward
+        frontal_base_direction = [-1, 0, 0]
 
-    # For iCubV2_5, the reversed x axis of the base frame is pointing forward
-    frontal_base_direction = [-1, 0, 0]
+    elif robot == "iCubV3":
+        # For iCubV3, the x axis is pointing forward
+        frontal_base_direction = [1, 0, 0]
+
+    else:
+        raise Exception("Frontal base direction only defined for iCubV2_5 and iCubV3.")
 
     return frontal_base_direction
 
 def define_frontal_chest_direction(robot: str) -> List:
     """Define the robot-specific frontal chest direction in the chest frame."""
 
-    if robot != "iCubV2_5":
-        raise Exception("Frontal chest direction only defined for iCubV2_5.")
+    if robot == "iCubV2_5":
+        # For iCubV2_5, the z axis of the chest frame is pointing forward
+        frontal_chest_direction = [0, 0, 1]
 
-    # For iCubV2_5, the z axis of the chest frame is pointing forward
-    frontal_base_direction = [0, 0, 1]
+    elif robot == "iCubV3":
+        # For iCubV3, the x axis of the chest frame is pointing forward
+        frontal_chest_direction = [1, 0, 0]
 
-    return frontal_base_direction
+    else:
+        raise Exception("Frontal chest direction only defined for iCubV2_5 and iCubV3.")
+
+    return frontal_chest_direction
 
 def rotation_2D(angle: float) -> np.array:
     """Auxiliary function for a 2-dimensional rotation matrix."""
