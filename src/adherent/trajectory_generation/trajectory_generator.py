@@ -364,8 +364,8 @@ class KinematicComputations:
     feet_frames: Dict
     support_foot_prev: str
     support_foot: str
-    support_vertex_prev: int = 0
-    support_vertex: int = 0
+    support_vertex_prev: int
+    support_vertex: int
     support_foot_pos: float = 0
     support_vertex_pos: float = 0
     support_vertex_offset: float = 0
@@ -376,6 +376,8 @@ class KinematicComputations:
               feet_frames: Dict,
               icub: iCub,
               gazebo: scenario.GazeboSimulator,
+              initial_support_foot: str,
+              initial_support_vertex: int,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
               difference_height_norm_threshold: bool = 0.005) -> "KinematicComputations":
@@ -392,8 +394,10 @@ class KinematicComputations:
                                      postural_extractor=postural_extractor,
                                      local_foot_vertices_pos=local_foot_vertices_pos,
                                      feet_frames=feet_frames,
-                                     support_foot_prev=feet_frames["right_foot"],
-                                     support_foot=feet_frames["right_foot"],
+                                     support_foot_prev=feet_frames[initial_support_foot],
+                                     support_foot=feet_frames[initial_support_foot],
+                                     support_vertex_prev=initial_support_vertex,
+                                     support_vertex=initial_support_vertex,
                                      icub=icub,
                                      controlled_joints=icub.joint_names(),
                                      gazebo=gazebo)
@@ -1405,6 +1409,8 @@ class TrajectoryGenerator:
               initial_base_yaw: float,
               frontal_base_direction: List,
               frontal_chest_direction: List,
+              initial_support_foot: str,
+              initial_support_vertex: int,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
               difference_height_norm_threshold: bool = 0.005,
@@ -1425,6 +1431,8 @@ class TrajectoryGenerator:
                                                       feet_frames=feet_frames,
                                                       icub=icub,
                                                       gazebo=gazebo,
+                                                      initial_support_foot=initial_support_foot,
+                                                      initial_support_vertex=initial_support_vertex,
                                                       nominal_DS_duration=nominal_DS_duration,
                                                       difference_position_threshold=difference_position_threshold,
                                                       difference_height_norm_threshold=difference_height_norm_threshold)

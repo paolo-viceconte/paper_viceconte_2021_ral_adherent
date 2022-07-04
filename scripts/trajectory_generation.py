@@ -26,6 +26,7 @@ from adherent.data_processing.utils import define_frontal_base_direction
 from adherent.data_processing.utils import define_frontal_chest_direction
 from adherent.trajectory_generation.utils import define_initial_base_height
 from adherent.trajectory_generation.utils import define_initial_past_trajectory
+from adherent.trajectory_generation.utils import define_initial_support_foot_and_vertex
 
 import matplotlib as mpl
 mpl.rcParams['toolbar'] = 'None'
@@ -143,6 +144,9 @@ frontal_chest_dir = define_frontal_chest_direction(robot="iCubV3")
 # Define robot-specific feet frames
 feet_frames = define_feet_frames(robot="iCubV3")
 
+# Define robot-specific initial support foot and vertex
+initial_support_foot, initial_support_vertex = define_initial_support_foot_and_vertex(robot="iCubV3")
+
 # Instantiate the trajectory generator
 generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gazebo, kindyn=kindyn,
                                                            storage_path=os.path.join(script_directory, storage_path),
@@ -156,7 +160,9 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
                                                            initial_base_height=initial_base_height,
                                                            initial_base_yaw=initial_base_yaw,
                                                            frontal_base_direction=frontal_base_dir,
-                                                           frontal_chest_direction=frontal_chest_dir)
+                                                           frontal_chest_direction=frontal_chest_dir,
+                                                           initial_support_foot=initial_support_foot,
+                                                           initial_support_vertex=initial_support_vertex)
 
 # =========
 # MAIN LOOP
