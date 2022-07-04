@@ -12,6 +12,7 @@ from scenario import gazebo as scenario
 from gym_ignition.utils.scenario import init_gazebo_sim
 from adherent.data_processing.utils import iCub
 from adherent.trajectory_generation.utils import SphereURDF
+from adherent.data_processing.utils import define_feet_frames
 from adherent.trajectory_generation.utils import Shape
 from adherent.trajectory_generation.utils import visualize_generated_motion
 
@@ -34,6 +35,9 @@ plot_blending_coeffs = not args.deactivate_blending_coeffs_plot
 # LOAD TRAJECTORY GENERATION DATA
 # ===============================
 
+# Define robot-specific feet frames
+feet_frames = define_feet_frames(robot="iCubV3")
+
 # Define the paths for the generated postural, footsteps, joystick inputs and blending coefficients
 script_directory = os.path.dirname(os.path.abspath(__file__))
 storage_path = os.path.join(script_directory, storage_path)
@@ -49,8 +53,8 @@ with open(postural_path, 'r') as openfile:
 # Load generated footsteps
 with open(footsteps_path, 'r') as openfile:
     footsteps = json.load(openfile)
-    l_footsteps = footsteps["l_foot"]
-    r_footsteps = footsteps["r_foot"]
+    l_footsteps = footsteps[feet_frames["left_foot"]]
+    r_footsteps = footsteps[feet_frames["right_foot"]]
 
 # Load joystick inputs (motion and facing directions) associated to the generated trajectory
 with open(joystick_input_path, 'r') as openfile:
@@ -77,7 +81,7 @@ scenario.set_verbosity(scenario.Verbosity_warning)
 gazebo, world = init_gazebo_sim()
 
 # Retrieve the robot urdf model
-icub_urdf = os.path.join(script_directory, "../src/adherent/model/iCubGazeboSimpleCollisionsV2_5_xsens/iCubGazeboSimpleCollisionsV2_5_xsens.urdf")
+icub_urdf = os.path.join(script_directory, "../src/adherent/model/iCubGazeboV3_xsens/iCubGazeboV3_xsens.urdf")
 
 # Insert the robot in the empty world
 icub = iCub(world=world, urdf=icub_urdf)
