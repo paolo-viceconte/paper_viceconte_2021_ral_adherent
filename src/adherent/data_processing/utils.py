@@ -66,8 +66,8 @@ def define_feet_frames(robot: str) -> Dict:
         left_foot = "l_foot"
 
     elif robot == "iCubV3":
-        right_foot = "r_foot_rear"
-        left_foot = "l_foot_rear"
+        right_foot = "r_sole"
+        left_foot = "l_sole"
 
     else:
         raise Exception("Feet frames only defined for iCubV2_5 and iCubV3.")
@@ -96,24 +96,20 @@ def define_foot_vertices(robot: str) -> List:
 
     elif robot == "iCubV3":
 
-        # TODO: for iCubV3, the considered foot frame is the foot rear
-        # For iCubV3, the feet vertices are not symmetrically placed wrt the foot rear frame origin.
-        # The foot rear frame has z pointing up, x pointing forward and y pointing left.
-
-        # Origin of the box which represents the foot rear (in the foot frame)
-        box_origin = [0.0, 0.0, 0.003]
+        # For iCubV3, the feet vertices are symmetrically placed wrt the sole frame origin.
+        # The sole frame has z pointing up, x pointing forward and y pointing left.
 
         # Size of the box which represents the foot rear
         box_size = [0.117, 0.1, 0.006]
 
         # Distance between the foot rear and the foot front boxes
-        boxes_distance = 0.002
+        boxes_distance = 0.00225
 
         # Define front-left (FL), front-right (FR), back-left (BL) and back-right (BR) vertices in the foot frame
-        FL_vertex_pos = [box_origin[0] + box_size[0] / 2 + boxes_distance + box_size[0], box_origin[1] + box_size[1] / 2, box_origin[2]]
-        FR_vertex_pos = [box_origin[0] + box_size[0] / 2 + boxes_distance + box_size[0], box_origin[1] - box_size[1] / 2, box_origin[2]]
-        BL_vertex_pos = [box_origin[0] - box_size[0] / 2, box_origin[1] + box_size[1] / 2, box_origin[2]]
-        BR_vertex_pos = [box_origin[0] - box_size[0] / 2, box_origin[1] - box_size[1] / 2, box_origin[2]]
+        FL_vertex_pos = [box_size[0] + boxes_distance / 2, box_size[1] / 2, 0]
+        FR_vertex_pos = [box_size[0] + boxes_distance / 2, - box_size[1] / 2, 0]
+        BL_vertex_pos = [- box_size[0] - boxes_distance / 2, box_size[1] / 2, 0]
+        BR_vertex_pos = [- box_size[0] - boxes_distance / 2, - box_size[1] / 2, 0]
 
     else:
         raise Exception("Feet vertices positions only defined for iCubV2_5 and iCubV3.")
