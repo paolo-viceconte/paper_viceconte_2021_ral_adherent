@@ -24,6 +24,7 @@ from adherent.trajectory_generation.utils import define_initial_nn_X
 from adherent.trajectory_generation.utils import define_initial_base_yaw
 from adherent.data_processing.utils import define_frontal_base_direction
 from adherent.data_processing.utils import define_frontal_chest_direction
+from adherent.trajectory_generation.utils import define_base_pitch_offset
 from adherent.trajectory_generation.utils import define_initial_base_height
 from adherent.trajectory_generation.utils import define_initial_past_trajectory
 from adherent.trajectory_generation.utils import define_initial_support_foot_and_vertex
@@ -168,6 +169,9 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
 # MAIN LOOP
 # =========
 
+# Define robot-specific base pitch offset
+base_pitch_offset = define_base_pitch_offset(robot="iCubV3")
+
 with tf.Session(config=config) as sess:
 
     # Restore the learned model and retrieve the tensors of interest
@@ -186,8 +190,9 @@ with tf.Session(config=config) as sess:
                                                                         blending_coefficients=blending_coefficients)
 
         # Apply the joint positions and the base orientation from the network output
-        joint_positions, new_base_quaternion = \
-            generator.apply_joint_positions_and_base_orientation(denormalized_current_output=denormalized_current_output)
+        joint_positions, new_base_quaternion = generator.apply_joint_positions_and_base_orientation(
+            denormalized_current_output=denormalized_current_output,
+            base_pitch_offset=base_pitch_offset)
 
         # Update the support foot and vertex while detecting new footsteps
         support_foot, update_footsteps_list = generator.update_support_vertex_and_support_foot_and_footsteps()

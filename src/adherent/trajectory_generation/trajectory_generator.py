@@ -1501,7 +1501,7 @@ class TrajectoryGenerator:
 
         return current_output, denormalized_current_output, current_blending_coefficients
 
-    def apply_joint_positions_and_base_orientation(self, denormalized_current_output: List) -> (List, List):
+    def apply_joint_positions_and_base_orientation(self, denormalized_current_output: List, base_pitch_offset: float = 0) -> (List, List):
         """Apply joint positions and base orientation from the output returned by the network."""
 
         # Extract the new joint positions from the denormalized network output
@@ -1516,7 +1516,7 @@ class TrajectoryGenerator:
         # Extract the new base orientation from the output
         base_yaw_dot = omega * self.generation_rate
         new_base_yaw = self.autoregression.current_base_yaw + base_yaw_dot
-        new_base_rotation = Rotation.from_euler('xyz', [0, 0, new_base_yaw])
+        new_base_rotation = Rotation.from_euler('xyz', [0, base_pitch_offset, new_base_yaw])
         new_base_quaternion = Quaternion.to_wxyz(new_base_rotation.as_quat())
 
         # Update the base orientation and the joint positions in the robot configuration
