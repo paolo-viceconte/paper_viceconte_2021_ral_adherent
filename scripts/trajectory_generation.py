@@ -177,6 +177,8 @@ with tf.Session(config=config) as sess:
     # Restore the learned model and retrieve the tensors of interest
     nn_X, nn_keep_prob, output, blending_coefficients = generator.restore_model_and_retrieve_tensors(session=sess)
 
+    first_iteration = True
+
     while True:
 
         # Update the iteration counter
@@ -193,6 +195,23 @@ with tf.Session(config=config) as sess:
         joint_positions, new_base_quaternion = generator.apply_joint_positions_and_base_orientation(
             denormalized_current_output=denormalized_current_output,
             base_pitch_offset=base_pitch_offset)
+
+        # Handle first iteration differently
+        if first_iteration:
+
+            first_iteration = False
+
+        else:
+
+            # Update the support vertex position
+            generator.update_support_vertex_position()
+
+            # Compute kinematically-feasible base position and updated posturals
+            new_base_postural, new_joints_postural, new_links_postural, new_com_postural = \
+                generator.compute_kinematically_fasible_base_and_update_posturals(joint_positions=joint_positions,
+                                                                                  base_quaternion=new_base_quaternion,
+                                                                                  controlled_joints=controlled_joints,
+                                                                                  link_names=icub.link_names())
 
         # Update the support foot and vertex while detecting new footsteps
         support_foot, update_footsteps_list = generator.update_support_vertex_and_support_foot_and_footsteps()

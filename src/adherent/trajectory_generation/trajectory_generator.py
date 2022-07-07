@@ -561,6 +561,15 @@ class KinematicComputations:
 
         return kinematically_feasible_base_position
 
+    def update_support_vertex_pos(self) -> None:
+        """Update the support vertex position."""
+
+        # Retrieve the vertices positions in the world frame
+        W_vertices_positions = self.compute_W_vertices_pos()
+
+        # Update the support vertex position
+        self.support_vertex_pos = W_vertices_positions[self.support_vertex]
+
     def update_support_vertex_and_support_foot(self) -> (str, bool, bool):
         """Update the support vertex and the support foot. Also, return boolean variables indicating whether the
         deactivation time of the last footstep needs to be updated (update_footstep_deactivation_time) and whether
@@ -1532,6 +1541,11 @@ class TrajectoryGenerator:
         self.autoregression.new_base_yaw = new_base_yaw
 
         return joint_positions, new_base_quaternion
+
+    def update_support_vertex_position(self) -> None:
+        """Update the support vertex position."""
+
+        self.kincomputations.update_support_vertex_pos()
 
     def update_support_vertex_and_support_foot_and_footsteps(self) -> (str, bool):
         """Update the support vertex and the support foot. Handle updates of the footsteps list and of the deactivation
