@@ -343,7 +343,7 @@ class PosturalExtractor:
         """Retrieve the information related to a new set of postural terms."""
 
         # Store the postural term related to the base position and orientation
-        new_base_postural = {"postion": list(base_position), "wxyz_quaternions": list(base_quaternion)}
+        new_base_postural = {"position": list(base_position), "wxyz_quaternions": list(base_quaternion)}
 
         # Store the postural term related to the joint angles
         new_joints_postural = {controlled_joints[k]: joint_positions[k] for k in range(len(controlled_joints))}

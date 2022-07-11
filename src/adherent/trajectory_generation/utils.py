@@ -728,7 +728,7 @@ def visualize_generated_motion(icub: iCub,
 
         # Retrieve the current base position and orientation
         base_postural = base_posturals[frame_idx]
-        base_position = base_postural['postion']
+        base_position = base_postural['position']
         base_quaternion = base_postural['wxyz_quaternions']
 
         # Reset the robot configuration in the simulator
