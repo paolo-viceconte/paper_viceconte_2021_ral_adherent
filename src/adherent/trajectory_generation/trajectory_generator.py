@@ -42,6 +42,10 @@ class StorageHandler:
     joystick_input_path: str
     blending_coefficients_path: str
 
+    # Time scaling factor for the trajectory
+    time_scaling: int
+    generation_to_control_time_scaling: int
+
     # Storage dictionaries for footsteps, postural, joystick input and blending coefficients
     footsteps: Dict
     posturals: Dict = field(default_factory=lambda: {'base': [], 'joints': [], 'links': [], 'com': []})
@@ -49,7 +53,8 @@ class StorageHandler:
     blending_coeffs: Dict = field(default_factory=lambda: {'w_1': [], 'w_2': [], 'w_3': [], 'w_4': []})
 
     @staticmethod
-    def build(storage_path: str, feet_frames: Dict) -> "StorageHandler":
+    def build(storage_path: str, feet_frames: Dict,
+              generation_to_control_time_scaling: int, time_scaling: int = 1) -> "StorageHandler":
         """Build an instance of StorageHandler."""
 
         # Storage paths for the footsteps, postural, joystick input and blending coefficients
@@ -64,23 +69,31 @@ class StorageHandler:
                               postural_path,
                               joystick_input_path,
                               blending_coefficients_path,
-                              footsteps=footsteps)
+                              footsteps=footsteps,
+                              generation_to_control_time_scaling=generation_to_control_time_scaling,
+                              time_scaling=time_scaling)
 
     def update_joystick_inputs_storage(self, raw_data: List, quad_bezier: List, base_velocities: List, facing_dirs: List) -> None:
         """Update the storage of the joystick inputs."""
 
-        self.joystick_inputs["raw_data"].append(raw_data)
-        self.joystick_inputs["quad_bezier"].append(quad_bezier)
-        self.joystick_inputs["base_velocities"].append(base_velocities)
-        self.joystick_inputs["facing_dirs"].append(facing_dirs)
+        # Replicate the joystick inputs at the desired frequency
+        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+
+            self.joystick_inputs["raw_data"].append(raw_data)
+            self.joystick_inputs["quad_bezier"].append(quad_bezier)
+            self.joystick_inputs["base_velocities"].append(base_velocities)
+            self.joystick_inputs["facing_dirs"].append(facing_dirs)
 
     def update_blending_coefficients_storage(self, blending_coefficients: List) -> None:
         """Update the storage of the blending coefficients."""
 
-        self.blending_coeffs["w_1"].append(float(blending_coefficients[0][0]))
-        self.blending_coeffs["w_2"].append(float(blending_coefficients[0][1]))
-        self.blending_coeffs["w_3"].append(float(blending_coefficients[0][2]))
-        self.blending_coeffs["w_4"].append(float(blending_coefficients[0][3]))
+        # Replicate the blending coefficients at the desired frequency
+        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+
+            self.blending_coeffs["w_1"].append(float(blending_coefficients[0][0]))
+            self.blending_coeffs["w_2"].append(float(blending_coefficients[0][1]))
+            self.blending_coeffs["w_3"].append(float(blending_coefficients[0][2]))
+            self.blending_coeffs["w_4"].append(float(blending_coefficients[0][3]))
 
     def update_footsteps_storage(self, support_foot: str, footstep: Dict) -> None:
         """Add a footstep to the footsteps storage."""
@@ -95,10 +108,12 @@ class StorageHandler:
     def update_posturals_storage(self, base: Dict, joints: Dict, links: Dict, com: List) -> None:
         """Update the storage of the posturals."""
 
-        self.posturals["base"].append(base)
-        self.posturals["joints"].append(joints)
-        self.posturals["links"].append(links)
-        self.posturals["com"].append(com)
+        # Replicate the base and links posturals at the desired frequency
+        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+            self.posturals["joints"].append(joints)
+            self.posturals["com"].append(com)
+            self.posturals["base"].append(base)
+            self.posturals["links"].append(links)
 
     def save_data_as_json(self) -> None:
         """Save all the stored data using the json format."""
@@ -130,6 +145,9 @@ class FootstepsExtractor:
     # Define robot-specific feet frames definition
     feet_frames: Dict
 
+    # Time scaling factor for the generated trajectory
+    time_scaling: int
+
     # Auxiliary variables for the footsteps update before saving
     nominal_DS_duration: float
     difference_position_threshold: float
@@ -140,6 +158,7 @@ class FootstepsExtractor:
 
     @staticmethod
     def build(feet_frames: Dict,
+              time_scaling: int = 1,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
               difference_height_norm_threshold: bool = 0.005) -> "FootstepsExtractor":
@@ -148,7 +167,8 @@ class FootstepsExtractor:
         return FootstepsExtractor(feet_frames=feet_frames,
                                   nominal_DS_duration=nominal_DS_duration,
                                   difference_position_threshold=difference_position_threshold,
-                                  difference_height_norm_threshold=difference_height_norm_threshold)
+                                  difference_height_norm_threshold=difference_height_norm_threshold,
+                                  time_scaling=time_scaling)
 
     def should_update_footstep_deactivation_time(self, kindyn: kindyncomputations.KinDynComputations) -> bool:
         """Check whether the deactivation time of the last footstep needs to be updated."""
@@ -202,7 +222,7 @@ class FootstepsExtractor:
         new_footstep["2D_orient"] = W_RPY_SF[2]
 
         # Assign new footstep activation time
-        new_footstep["activation_time"] = activation_time
+        new_footstep["activation_time"] = activation_time * self.time_scaling
 
         # Use a temporary flag indicating that the deactivation time has not been computed yet
         new_footstep["deactivation_time"] = -1
@@ -220,7 +240,7 @@ class FootstepsExtractor:
         # Update the deactivation time of the last footstep of each foot (they need to coincide to be processed
         # properly in the trajectory control layer)
         for foot in footsteps.keys():
-            footsteps[foot][-1]["deactivation_time"] = final_deactivation_time
+            footsteps[foot][-1]["deactivation_time"] = final_deactivation_time * self.time_scaling
 
         # Replace temporary deactivation times in the footsteps list (if any)
         updated_footsteps = self.replace_temporary_deactivation_times(footsteps=footsteps)
@@ -256,7 +276,7 @@ class FootstepsExtractor:
                         if other_foot_activation_time > current_activation_time:
 
                             # Update the deactivation time so to have a double support (DS) phase of the nominal duration
-                            current_deactivation_time = other_foot_activation_time + self.nominal_DS_duration
+                            current_deactivation_time = other_foot_activation_time + self.nominal_DS_duration * self.time_scaling
                             footstep["deactivation_time"] = current_deactivation_time
 
                             break
@@ -301,7 +321,7 @@ class FootstepsExtractor:
 
             # If the last updated footstep ends before the final deactivation time, add the last original footstep
             # to the updated list of footsteps
-            if updated_footsteps[foot][-1]["deactivation_time"] != final_deactivation_time:
+            if updated_footsteps[foot][-1]["deactivation_time"] != final_deactivation_time * self.time_scaling:
                 updated_footsteps[foot].append(footsteps[foot][-1])
 
         return updated_footsteps
@@ -378,6 +398,7 @@ class KinematicComputations:
               gazebo: scenario.GazeboSimulator,
               initial_support_foot: str,
               initial_support_vertex: int,
+              time_scaling: int,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
               difference_height_norm_threshold: bool = 0.005) -> "KinematicComputations":
@@ -386,7 +407,9 @@ class KinematicComputations:
         footsteps_extractor = FootstepsExtractor.build(feet_frames=feet_frames,
                                                        nominal_DS_duration=nominal_DS_duration,
                                                        difference_position_threshold=difference_position_threshold,
-                                                       difference_height_norm_threshold=difference_height_norm_threshold)
+                                                       difference_height_norm_threshold=difference_height_norm_threshold,
+                                                       time_scaling=time_scaling)
+
         postural_extractor = PosturalExtractor.build()
 
         return KinematicComputations(kindyn=kindyn,
@@ -1399,8 +1422,8 @@ class TrajectoryGenerator:
     model: LearnedModel
 
     # Iteration counter and generation rate
+    generation_rate: float
     iteration: int = 0
-    generation_rate: float = 1/50
 
     @staticmethod
     def build(icub: iCub,
@@ -1420,6 +1443,7 @@ class TrajectoryGenerator:
               frontal_chest_direction: List,
               initial_support_foot: str,
               initial_support_vertex: int,
+              time_scaling: int,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
               difference_height_norm_threshold: bool = 0.005,
@@ -1431,7 +1455,9 @@ class TrajectoryGenerator:
               ellipsoid_forward_axis: float = 1.0,
               ellipsoid_side_axis: float = 0.9,
               ellipsoid_backward_axis: float = 0.6,
-              ellipsoid_scaling: float = 0.4) -> "TrajectoryGenerator":
+              ellipsoid_scaling: float = 0.4,
+              generation_rate: float = 1/50,
+              control_rate: float = 1/100) -> "TrajectoryGenerator":
         """Build an instance of TrajectoryGenerator."""
 
         # Build the kinematic computations handler component
@@ -1444,13 +1470,16 @@ class TrajectoryGenerator:
                                                       initial_support_vertex=initial_support_vertex,
                                                       nominal_DS_duration=nominal_DS_duration,
                                                       difference_position_threshold=difference_position_threshold,
-                                                      difference_height_norm_threshold=difference_height_norm_threshold)
+                                                      difference_height_norm_threshold=difference_height_norm_threshold,
+                                                      time_scaling=time_scaling)
 
         # Initialize the support vertex and the support foot
         kincomputations.set_initial_support_vertex_and_support_foot()
 
         # Build the storage handler component
-        storage = StorageHandler.build(storage_path=storage_path, feet_frames=feet_frames)
+        generation_to_control_time_scaling = int(generation_rate / control_rate)
+        storage = StorageHandler.build(storage_path=storage_path, feet_frames=feet_frames, time_scaling=time_scaling,
+                                       generation_to_control_time_scaling=generation_to_control_time_scaling)
 
         # Build the autoregression handler component
         autoregression = Autoregression.build(training_path=training_path,
@@ -1481,7 +1510,8 @@ class TrajectoryGenerator:
                                    storage=storage,
                                    autoregression=autoregression,
                                    plotter=plotter,
-                                   model=model)
+                                   model=model,
+                                   generation_rate=generation_rate)
 
     def restore_model_and_retrieve_tensors(self, session: tf.Session) -> (tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor):
         """Restore the learned model and retrieve the tensors of interest."""

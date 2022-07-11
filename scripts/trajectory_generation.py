@@ -48,6 +48,8 @@ parser.add_argument("--save_every_N_iterations", help="Data will be saved every 
 parser.add_argument("--plot_trajectory_blending", help="Visualize the blending of the future ground trajectory to build the next network input.", action="store_true")
 parser.add_argument("--plot_footsteps", help="Visualize the footsteps.", action="store_true")
 parser.add_argument("--plot_blending_coefficients", help="Visualize blending coefficient activations.", action="store_true")
+parser.add_argument("--time_scaling", help="Time scaling to be applied to the generated trajectory. Keep it integer.",
+                    type=int, default=1)
 
 args = parser.parse_args()
 
@@ -57,6 +59,7 @@ save_every_N_iterations = args.save_every_N_iterations
 plot_trajectory_blending = args.plot_trajectory_blending
 plot_footsteps = args.plot_footsteps
 plot_blending_coefficients = args.plot_blending_coefficients
+time_scaling = args.time_scaling
 
 # ==================
 # YARP CONFIGURATION
@@ -125,6 +128,10 @@ plt.ion()
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
+# Trajectory control and trajectory generation rates
+generation_rate = 1/50
+control_rate = 1/100
+
 # Define robot-specific feet vertices positions in the foot frame
 local_foot_vertices_pos = define_foot_vertices(robot="iCubV3")
 
@@ -163,7 +170,10 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
                                                            frontal_base_direction=frontal_base_dir,
                                                            frontal_chest_direction=frontal_chest_dir,
                                                            initial_support_foot=initial_support_foot,
-                                                           initial_support_vertex=initial_support_vertex)
+                                                           initial_support_vertex=initial_support_vertex,
+                                                           time_scaling=time_scaling,
+                                                           generation_rate=generation_rate,
+                                                           control_rate=control_rate)
 
 # =========
 # MAIN LOOP
