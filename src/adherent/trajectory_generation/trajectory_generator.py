@@ -105,15 +105,128 @@ class StorageHandler:
 
         self.footsteps = footsteps
 
+    def retrieve_smoothed_posturals(self, joints_prev: List, joints_curr: List, steps: int) -> List:
+        """Compute posturals which smoothly transition from the previous postural to the next postural.
+        They are as many as the specified 'steps' parameter."""
+
+        # Compute how much each joint position should be updated at each smoothing step
+        joints_update = {}
+        for joint in joints_prev:
+            joints_update[joint] = (joints_curr[joint] - joints_prev[joint]) / steps
+
+        # Fill the smoothed postural by adding the computed update at each smoothing step
+        postural_smoothed = []
+        postural_current = joints_prev.copy()
+        for _ in range(steps-1):
+            for joint in joints_prev:
+                postural_current[joint] += joints_update[joint]
+            postural_smoothed.append(postural_current)
+
+        # Add the next postural as last element of the smoothed posturals
+        postural_smoothed.append(joints_curr)
+
+        return postural_smoothed
+
+    def retrieve_smoothed_base_pos(self, base_prev: List, base_curr: List, steps: int) -> List:
+        """Compute base positions which smoothly transition from the previous base position to the next one.
+        They are as many as the specified 'steps' parameter."""
+
+        # Compute how much the base position should be updated at each smoothing step
+        base_update = (np.array(base_curr) - np.array(base_prev)) / steps
+
+        # Fill the smoothed base position by adding the computed update at each smoothing step
+        base_smoothed = []
+        base_current = base_prev.copy()
+        for _ in range(steps-1):
+            base_current += base_update
+            base_smoothed.append(list(base_current))
+
+        # Add the next base position as last element of the smoothed base positions
+        base_smoothed.append(base_curr)
+
+        return base_smoothed
+
+    def retrieve_smoothed_com(self, com_prev: List, com_curr: List, steps: int) -> List:
+        """Compute com positions which smoothly transition from the previous com position to the next one.
+        They are as many as the specified 'steps' parameter."""
+
+        # Compute how much the com position should be updated at each smoothing step
+        com_update = (np.array(com_curr) - np.array(com_prev)) / steps
+
+        # Fill the smoothed com position by adding the computed update at each smoothing step
+        com_smoothed = []
+        com_current = com_prev.copy()
+        for _ in range(steps-1):
+            com_current += com_update
+            com_smoothed.append(list(com_current))
+
+        # Add the next com position as last element of the smoothed com positions
+        com_smoothed.append(com_curr)
+
+        return com_smoothed
+
     def update_posturals_storage(self, base: Dict, joints: Dict, links: Dict, com: List) -> None:
         """Update the storage of the posturals."""
 
-        # Replicate the base and links posturals at the desired frequency
-        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
-            self.posturals["joints"].append(joints)
-            self.posturals["com"].append(com)
-            self.posturals["base"].append(base)
-            self.posturals["links"].append(links)
+        # ===============
+        # JOINTS POSTURAL
+        # ===============
+
+        if self.posturals["joints"] == []:
+
+            # Replicate the joints postural at the first iteration
+            for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+                self.posturals["joints"].append(joints)
+
+        else:
+
+            # Smooth the joints postural at the desired frequency
+            joints_prev = self.posturals["joints"][-1]
+            smoothed_joints = self.retrieve_smoothed_posturals(joints_prev, joints, self.generation_to_control_time_scaling * self.time_scaling)
+            self.posturals["joints"].extend(smoothed_joints)
+
+        # =============
+        # BASE POSTURAL
+        # =============
+
+        if self.posturals["base"] == []:
+
+            # Replicate the base at the first iteration
+            for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+                self.posturals["base"].append(base)
+
+        else:
+
+            # Smooth the base position at the desired frequency
+            base_pos_prev = self.posturals["base"][-1]["position"].copy()
+            smoothed_base_pos = self.retrieve_smoothed_base_pos(base_pos_prev, base["position"], self.generation_to_control_time_scaling * self.time_scaling)
+
+            # Replicate the base orientation at the desired frequency # TODO: smooth instead?
+            smoothed_base_quat = []
+            for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+                smoothed_base_quat.append(base["wxyz_quaternions"])
+
+            # Fill the smoothed base postural
+            for i in range(len(smoothed_base_quat)):
+                smoothed_base = {"position": smoothed_base_pos[i] , "wxyz_quaternions" : smoothed_base_quat[i]}
+                self.posturals["base"].extend([smoothed_base])
+
+        # ============
+        # COM POSTURAL
+        # ============
+
+        if self.posturals["com"] == []:
+
+            # Replicate the com at the first iteration
+            for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+                self.posturals["com"].append(com)
+
+        else:
+
+            # Smooth the com at the desired frequency
+            com_prev = self.posturals["com"][-1].copy()
+            smoothed_com = self.retrieve_smoothed_com(com_prev, com, self.generation_to_control_time_scaling * self.time_scaling)
+            self.posturals["com"].extend(smoothed_com)
 
     def save_data_as_json(self) -> None:
         """Save all the stored data using the json format."""
