@@ -177,8 +177,6 @@ with tf.Session(config=config) as sess:
     # Restore the learned model and retrieve the tensors of interest
     nn_X, nn_keep_prob, output, blending_coefficients = generator.restore_model_and_retrieve_tensors(session=sess)
 
-    first_iteration = True
-
     while True:
 
         # Update the iteration counter
@@ -197,11 +195,7 @@ with tf.Session(config=config) as sess:
             base_pitch_offset=base_pitch_offset)
 
         # Handle first iteration differently
-        if first_iteration:
-
-            first_iteration = False
-
-        else:
+        if generator.iteration > 1:
 
             # Update the support vertex position
             generator.update_support_vertex_position()
