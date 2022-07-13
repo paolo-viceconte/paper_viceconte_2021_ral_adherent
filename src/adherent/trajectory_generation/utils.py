@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import math
+import time
 import numpy as np
 from scenario import core
 from typing import List, Dict
@@ -850,7 +851,7 @@ def visualize_generated_motion(icub: iCub,
             plt.clf()
 
             plt.plot(range(len(com_pos_postural_x)), com_pos_postural_x, label='com_pos_postural_x', color='r')
-            plt.plot(range(len(com_pos_postural_y)), com_pos_postural_y, label='com_pos_postural_y', color='g')
+            plt.plot(range(len(com_pos_postural_y)), com_pos_postural_y, label='com_pos_postural_y', color='y')
             plt.plot(range(len(com_pos_postural_z)), com_pos_postural_z, label='com_pos_postural_z', color='b')
 
             # Plot configuration
@@ -875,7 +876,7 @@ def visualize_generated_motion(icub: iCub,
             plt.clf()
 
             plt.plot(range(len(com_vel_postural_x)), com_vel_postural_x, label='com_vel_postural_x', color='r')
-            plt.plot(range(len(com_vel_postural_y)), com_vel_postural_y, label='com_vel_postural_y', color='g')
+            plt.plot(range(len(com_vel_postural_y)), com_vel_postural_y, label='com_vel_postural_y', color='y')
             plt.plot(range(len(com_vel_postural_z)), com_vel_postural_z, label='com_vel_postural_z', color='b')
 
             # Plot configuration
@@ -935,9 +936,13 @@ def visualize_generated_motion(icub: iCub,
             plt.xlabel("Time [s]")
             plt.legend()
 
-        # Plot
-        plt.show()
-        plt.pause(0.0001)
+        if plot_blending_coeffs or plot_joystick_inputs or plot_com or plot_momentum:
+            # Plot
+            plt.show()
+            plt.pause(0.0001)
+        else:
+            # Show robot motion in real time
+            time.sleep(0.01)
 
     input("Press Enter to end the visualization of the generated trajectory.")
 
