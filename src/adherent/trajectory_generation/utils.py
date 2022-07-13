@@ -692,13 +692,20 @@ def visualize_generated_motion(icub: iCub,
                                posturals: Dict,
                                raw_data: List,
                                blending_coeffs: Dict,
-                               plot_blending_coeffs: bool) -> None:
-    """Visualize the generated motion along with the joystick inputs used to generate it and,
-    optionally, the activations of the blending coefficients during the trajectory generation."""
+                               plot_blending_coeffs: bool = False,
+                               plot_joystick_inputs: bool = False,
+                               plot_com: bool = False,
+                               plot_momentum: bool = False) -> None:
+    """Visualize the generated motion, optionally along with the joystick inputs used to generate it, the activations
+    of the blending coefficients, the com and the momentum evolution during the trajectory generation."""
 
-    # Retrieve joint and base posturals
-    joint_posturals = posturals["joints"]
+    # Extract posturals
+    joint_pos_posturals = posturals["joints_pos"]
+    joint_vel_posturals = posturals["joints_vel"]
     base_posturals = posturals["base"]
+    com_pos_posturals = posturals["com_pos"]
+    com_vel_posturals = posturals["com_vel"]
+    centroidal_momentum_posturals = posturals["centroidal_momentum"]
 
     # Retrieve blending coefficients
     if plot_blending_coeffs:
@@ -713,17 +720,17 @@ def visualize_generated_motion(icub: iCub,
     # Plot configuration
     plt.ion()
 
-    for frame_idx in range(len(joint_posturals)):
+    for frame_idx in range(len(joint_pos_posturals)):
 
         # Debug
-        print(frame_idx, "/", len(joint_posturals))
+        print(frame_idx, "/", len(joint_pos_posturals))
 
         # ======================
         # VISUALIZE ROBOT MOTION
         # ======================
 
         # Retrieve the current joint positions
-        joint_postural = joint_posturals[frame_idx]
+        joint_postural = joint_pos_posturals[frame_idx]
         joint_positions = [joint_postural[joint] for joint in controlled_joints]
 
         # Retrieve the current base position and orientation
@@ -740,68 +747,73 @@ def visualize_generated_motion(icub: iCub,
         # PLOT THE MOTION DIRECTION ON FIGURE 1
         # =====================================
 
-        # Retrieve the current motion direction
-        curr_raw_data = raw_data[frame_idx]
-        curr_x = curr_raw_data[0]
-        curr_y = curr_raw_data[1]
+        if plot_joystick_inputs:
 
-        plt.figure(1)
-        plt.clf()
+            # Retrieve the current motion direction
+            curr_raw_data = raw_data[frame_idx]
+            curr_x = curr_raw_data[0]
+            curr_y = curr_raw_data[1]
 
-        # Circumference of unitary radius
-        r = 1
-        x = np.linspace(-r, r, 1000)
-        y = np.sqrt(-x ** 2 + r ** 2)
-        plt.plot(x, y, 'r')
-        plt.plot(x, -y, 'r')
+            plt.figure(1)
+            plt.clf()
 
-        # Motion direction
-        plt.scatter(0, 0, c='r')
-        desired_motion_direction = plt.arrow(0, 0, curr_x, -curr_y, length_includes_head=True, width=0.01,
-                                             head_width=8 * 0.01, head_length=1.8 * 8 * 0.01, color='r')
+            # Circumference of unitary radius
+            r = 1
+            x = np.linspace(-r, r, 1000)
+            y = np.sqrt(-x ** 2 + r ** 2)
+            plt.plot(x, y, 'r')
+            plt.plot(x, -y, 'r')
 
-        # Plot configuration
-        plt.axis('scaled')
-        plt.xlim([-1.2, 1.2])
-        plt.ylim([-1.4, 1.2])
-        plt.axis('off')
-        plt.legend([desired_motion_direction], ['DESIRED MOTION DIRECTION'], loc="lower center")
+            # Motion direction
+            plt.scatter(0, 0, c='r')
+            desired_motion_direction = plt.arrow(0, 0, curr_x, -curr_y, length_includes_head=True, width=0.01,
+                                                 head_width=8 * 0.01, head_length=1.8 * 8 * 0.01, color='r')
+
+            # Plot configuration
+            plt.axis('scaled')
+            plt.xlim([-1.2, 1.2])
+            plt.ylim([-1.4, 1.2])
+            plt.axis('off')
+            plt.legend([desired_motion_direction], ['DESIRED MOTION DIRECTION'], loc="lower center")
 
         # =====================================
         # PLOT THE FACING DIRECTION ON FIGURE 2
         # =====================================
 
-        # Retrieve the current facing direction
-        curr_z = curr_raw_data[2]
-        curr_rz = curr_raw_data[3]
+        if plot_joystick_inputs:
 
-        plt.figure(2)
-        plt.clf()
+            # Retrieve the current facing direction
+            curr_z = curr_raw_data[2]
+            curr_rz = curr_raw_data[3]
 
-        # Circumference of unitary norm
-        r = 1
-        x = np.linspace(-r, r, 1000)
-        y = np.sqrt(-x ** 2 + r ** 2)
-        plt.plot(x, y, 'b')
-        plt.plot(x, -y, 'b')
+            plt.figure(2)
+            plt.clf()
 
-        # Facing direction
-        plt.scatter(0, 0, c='b')
-        desired_facing_direction = plt.arrow(0, 0, curr_z, -curr_rz, length_includes_head=True, width=0.01,
-                                             head_width=8 * 0.01, head_length=1.8 * 8 * 0.01, color='b')
+            # Circumference of unitary norm
+            r = 1
+            x = np.linspace(-r, r, 1000)
+            y = np.sqrt(-x ** 2 + r ** 2)
+            plt.plot(x, y, 'b')
+            plt.plot(x, -y, 'b')
 
-        # Plot configuration
-        plt.axis('scaled')
-        plt.xlim([-1.2, 1.2])
-        plt.ylim([-1.4, 1.2])
-        plt.axis('off')
-        plt.legend([desired_facing_direction], ['DESIRED FACING DIRECTION'], loc="lower center")
+            # Facing direction
+            plt.scatter(0, 0, c='b')
+            desired_facing_direction = plt.arrow(0, 0, curr_z, -curr_rz, length_includes_head=True, width=0.01,
+                                                 head_width=8 * 0.01, head_length=1.8 * 8 * 0.01, color='b')
+
+            # Plot configuration
+            plt.axis('scaled')
+            plt.xlim([-1.2, 1.2])
+            plt.ylim([-1.4, 1.2])
+            plt.axis('off')
+            plt.legend([desired_facing_direction], ['DESIRED FACING DIRECTION'], loc="lower center")
 
         # ==========================================
         # PLOT THE BLENDING COEFFICIENTS ON FIGURE 3
         # ==========================================
 
         if plot_blending_coeffs:
+
             # Retrieve the blending coefficients up to the current time
             curr_w_1 = w_1[:frame_idx]
             curr_w_2 = w_2[:frame_idx]
@@ -822,8 +834,110 @@ def visualize_generated_motion(icub: iCub,
             plt.ylabel("Blending coefficients")
             plt.xlabel("Time [s]")
 
+        # ============
+        # PLOT COM POS
+        # ============
+
+        if plot_com:
+
+            # Retrieve the com pos posturals up to the current time
+            com_pos_postural = com_pos_posturals[:frame_idx]
+            com_pos_postural_x = [elem[0] for elem in com_pos_postural]
+            com_pos_postural_y = [elem[1] for elem in com_pos_postural]
+            com_pos_postural_z = [elem[2] for elem in com_pos_postural]
+
+            plt.figure(4)
+            plt.clf()
+
+            plt.plot(range(len(com_pos_postural_x)), com_pos_postural_x, label='com_pos_postural_x', color='r')
+            plt.plot(range(len(com_pos_postural_y)), com_pos_postural_y, label='com_pos_postural_y', color='g')
+            plt.plot(range(len(com_pos_postural_z)), com_pos_postural_z, label='com_pos_postural_z', color='b')
+
+            # Plot configuration
+            plt.title("Com positions")
+            plt.ylabel("CoM positions")
+            plt.xlabel("Time [s]")
+            plt.legend()
+
+        # ============
+        # PLOT COM VEL
+        # ============
+
+        if plot_com:
+
+            # Retrieve the com vel posturals up to the current time
+            com_vel_postural = com_vel_posturals[:frame_idx]
+            com_vel_postural_x = [elem[0] for elem in com_vel_postural]
+            com_vel_postural_y = [elem[1] for elem in com_vel_postural]
+            com_vel_postural_z = [elem[2] for elem in com_vel_postural]
+
+            plt.figure(5)
+            plt.clf()
+
+            plt.plot(range(len(com_vel_postural_x)), com_vel_postural_x, label='com_vel_postural_x', color='r')
+            plt.plot(range(len(com_vel_postural_y)), com_vel_postural_y, label='com_vel_postural_y', color='g')
+            plt.plot(range(len(com_vel_postural_z)), com_vel_postural_z, label='com_vel_postural_z', color='b')
+
+            # Plot configuration
+            plt.title("Com velocities")
+            plt.ylabel("CoM velocities")
+            plt.xlabel("Time [s]")
+            plt.legend()
+
+        # ====================
+        # PLOT LINEAR MOMENTUM
+        # ====================
+
+        if plot_momentum:
+
+            # Retrieve the linear momentum postural up to the current time
+            centroidal_momentum_postural = centroidal_momentum_posturals[:frame_idx]
+            linear_momentum_postural = [elem[0] for elem in centroidal_momentum_postural]
+            linear_momentum_postural_x = [elem[0] for elem in linear_momentum_postural]
+            linear_momentum_postural_y = [elem[1] for elem in linear_momentum_postural]
+            linear_momentum_postural_z = [elem[2] for elem in linear_momentum_postural]
+
+            plt.figure(6)
+            plt.clf()
+
+            plt.plot(range(len(linear_momentum_postural_x)), linear_momentum_postural_x, label='linear_momentum_postural_x', color='r')
+            plt.plot(range(len(linear_momentum_postural_y)), linear_momentum_postural_y, label='linear_momentum_postural_y', color='y')
+            plt.plot(range(len(linear_momentum_postural_z)), linear_momentum_postural_z, label='linear_momentum_postural_z', color='b')
+
+            # Plot configuration
+            plt.title("Linear momentum")
+            plt.ylabel("Linear momentum")
+            plt.xlabel("Time [s]")
+            plt.legend()
+
+        # =====================
+        # PLOT ANGULAR MOMENTUM
+        # =====================
+
+        if plot_momentum:
+
+            # Retrieve the angular momentum postural up to the current time
+            angular_momentum_postural = [elem[1] for elem in centroidal_momentum_postural]
+            angular_momentum_postural_x = [elem[0] for elem in angular_momentum_postural]
+            angular_momentum_postural_y = [elem[1] for elem in angular_momentum_postural]
+            angular_momentum_postural_z = [elem[2] for elem in angular_momentum_postural]
+
+            plt.figure(7)
+            plt.clf()
+
+            plt.plot(range(len(angular_momentum_postural_x)), angular_momentum_postural_x, label='angular_momentum_postural_x', color='r')
+            plt.plot(range(len(angular_momentum_postural_y)), angular_momentum_postural_y, label='angular_momentum_postural_y', color='y')
+            plt.plot(range(len(angular_momentum_postural_z)), angular_momentum_postural_z, label='angular_momentum_postural_z', color='b')
+
+            # Plot configuration
+            plt.title("Angular momentum")
+            plt.ylabel("Angular momentum")
+            plt.xlabel("Time [s]")
+            plt.legend()
+
         # Plot
         plt.show()
         plt.pause(0.0001)
 
     input("Press Enter to end the visualization of the generated trajectory.")
+

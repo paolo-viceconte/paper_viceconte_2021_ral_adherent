@@ -24,12 +24,18 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--storage_path", help="Path where the generated trajectory is stored. Relative path from script folder.",
                     type=str, default="../datasets/inference/")
-parser.add_argument("--deactivate_blending_coeffs_plot", help="Deactivate plot of the blending coefficients.", action="store_true")
+parser.add_argument("--plot_blending_coeffs", help="Activate plot of the blending coefficients.", action="store_true")
+parser.add_argument("--plot_joystick_inputs", help="Activate plot of the joystick inputs.", action="store_true")
+parser.add_argument("--plot_com", help="Activate plot of the CoM position and velocity.", action="store_true")
+parser.add_argument("--plot_momentum", help="Activate plot of the linear and angular centroidal momentum.", action="store_true")
 
 args = parser.parse_args()
 
 storage_path = args.storage_path
-plot_blending_coeffs = not args.deactivate_blending_coeffs_plot
+plot_blending_coeffs = args.plot_blending_coeffs
+plot_joystick_inputs = args.plot_joystick_inputs
+plot_com = args.plot_com
+plot_momentum = args.plot_momentum
 
 # ===============================
 # LOAD TRAJECTORY GENERATION DATA
@@ -128,7 +134,9 @@ for ground_r_footstep in ground_r_footsteps:
 input("Press Enter to start the visualization of the generated trajectory.")
 visualize_generated_motion(icub=icub, gazebo=gazebo, posturals=posturals,
                            raw_data=raw_data, blending_coeffs=blending_coeffs,
-                           plot_blending_coeffs=plot_blending_coeffs)
+                           plot_blending_coeffs=plot_blending_coeffs,
+                           plot_joystick_inputs=plot_joystick_inputs,
+                           plot_com=plot_com, plot_momentum=plot_momentum)
 
 
 
