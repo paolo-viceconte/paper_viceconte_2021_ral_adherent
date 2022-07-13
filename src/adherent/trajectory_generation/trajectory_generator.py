@@ -105,113 +105,46 @@ class StorageHandler:
 
         self.footsteps = footsteps
 
-    def retrieve_smoothed_joints(self, joints_prev: List, joints_curr: List, steps: int) -> List:
-        """Compute joints which smoothly transition from the previous postural to the next postural.
-        They are as many as the specified 'steps' parameter."""
+    def retrieve_smoothed_dict(self, prev: Dict, next: Dict, steps: int) -> List:
+        """Compute a list of dictionaries which smoothly transition from the previous dictionary to the next one.
+        The list contains as many dictionaries as the specified 'steps' parameter."""
 
-        # Compute how much each joint position should be updated at each smoothing step
-        joints_update = {}
-        for joint in joints_prev:
-            joints_update[joint] = (joints_curr[joint] - joints_prev[joint]) / steps
+        # Compute how much each entry of the dictionaries should be updated at each smoothing step
+        update = {}
+        for key in prev:
+            update[key] = (next[key] - prev[key]) / steps
 
-        # Fill the smoothed postural by adding the computed update at each smoothing step
-        postural_smoothed = []
-        postural_current = joints_prev.copy()
+        # Fill the smoothed list of dictionaries by iteratively adding the update to the previous dictionary
+        smoothed_list = []
+        curr = prev.copy()
         for _ in range(steps-1):
-            for joint in joints_prev:
-                postural_current[joint] += joints_update[joint]
-            postural_smoothed.append(postural_current)
+            for key in curr:
+                curr[key] += update[key]
+            smoothed_list.append(curr)
 
-        # Add the next postural as last element of the smoothed posturals
-        postural_smoothed.append(joints_curr)
+        # Add the next dictionary as last element of the smoothed list
+        smoothed_list.append(next)
 
-        return postural_smoothed
+        return smoothed_list
 
-    def retrieve_smoothed_base_pos(self, base_prev: List, base_curr: List, steps: int) -> List:
-        """Compute base positions which smoothly transition from the previous base position to the next one.
-        They are as many as the specified 'steps' parameter."""
+    def retrieve_smoothed_3Dsignal(self, prev: List, next: List, steps: int) -> List:
+        """Compute a list of 3D signals which smoothly transition from the previous 3D signal to the next one.
+        The list contains as many 3D signals as the specified 'steps' parameter."""
 
-        # Compute how much the base position should be updated at each smoothing step
-        base_update = (np.array(base_curr) - np.array(base_prev)) / steps
+        # Compute how much the 3D signal should be updated at each smoothing step
+        update = (np.array(next) - np.array(prev)) / steps
 
-        # Fill the smoothed base position by adding the computed update at each smoothing step
-        base_smoothed = []
-        base_current = base_prev.copy()
+        # Fill the smoothed list of 3D signals by iteratively adding the update to the previous 3D signal
+        smoothed_list = []
+        curr = prev.copy()
         for _ in range(steps-1):
-            base_current += base_update
-            base_smoothed.append(list(base_current))
+            curr += update
+            smoothed_list.append(list(curr))
 
-        # Add the next base position as last element of the smoothed base positions
-        base_smoothed.append(base_curr)
+        # Add the next 3D signal as last element of the smoothed list
+        smoothed_list.append(next)
 
-        return base_smoothed
-
-    def retrieve_smoothed_com(self, com_prev: List, com_curr: List, steps: int) -> List:
-        """Compute com positions which smoothly transition from the previous com position to the next one.
-        They are as many as the specified 'steps' parameter."""
-
-        # Compute how much the com position should be updated at each smoothing step
-        com_update = (np.array(com_curr) - np.array(com_prev)) / steps
-
-        # Fill the smoothed com position by adding the computed update at each smoothing step
-        com_smoothed = []
-        com_current = com_prev.copy()
-        for _ in range(steps-1):
-            com_current += com_update
-            com_smoothed.append(list(com_current))
-
-        # Add the next com position as last element of the smoothed com positions
-        com_smoothed.append(com_curr)
-
-        return com_smoothed
-
-    def retrieve_smoothed_centroidal_momentum(self, centroidal_momentum_prev: List, centroidal_momentum_curr: List, steps: int) -> List:
-        """Compute linear and angular momentum which smoothly transition from the previous ones to the next ones.
-        They are as many as the specified 'steps' parameter."""
-
-        # Retrieve linear and angular momentum
-        linear_momentum_prev = centroidal_momentum_prev[0]
-        angular_momentum_prev = centroidal_momentum_prev[1]
-        linear_momentum_curr = centroidal_momentum_curr[0]
-        angular_momentum_curr = centroidal_momentum_curr[1]
-
-        # ===============
-        # LINEAR MOMENTUM
-        # ===============
-
-        # Compute how much the linear momentum should be updated at each smoothing step
-        linear_momentum_update = (np.array(linear_momentum_curr) - np.array(linear_momentum_prev)) / steps
-
-        # Fill the smoothed linear momentum by adding the computed update at each smoothing step
-        linear_momentum_smoothed = []
-        linear_momentum_current = linear_momentum_prev.copy()
-        for _ in range(steps-1):
-            linear_momentum_current += linear_momentum_update
-            linear_momentum_smoothed.append(list(linear_momentum_current))
-
-        # Add the next linear momentum as last element of the smoothed linear momentum
-        linear_momentum_smoothed.append(linear_momentum_curr)
-
-        # ================
-        # ANGULAR MOMENTUM
-        # ================
-
-        # Compute how much the linear momentum should be updated at each smoothing step
-        angular_momentum_update = (np.array(angular_momentum_curr) - np.array(angular_momentum_prev)) / steps
-
-        # Fill the smoothed angular momentum by adding the computed update at each smoothing step
-        angular_momentum_smoothed = []
-        angular_momentum_current = angular_momentum_prev.copy()
-        for _ in range(steps-1):
-            angular_momentum_current += angular_momentum_update
-            angular_momentum_smoothed.append(list(angular_momentum_current))
-
-        # Add the next angular momentum as last element of the smoothed angular momentum
-        angular_momentum_smoothed.append(angular_momentum_curr)
-
-        smoothed_centroidal_momentum = [[linear_momentum_smoothed[k], angular_momentum_smoothed[k]] for k in range(len(linear_momentum_smoothed))]
-
-        return smoothed_centroidal_momentum
+        return smoothed_list
 
     def update_posturals_storage(self, base: Dict, joints_pos: Dict, joints_vel: Dict,
                                  links: Dict, com_pos: List, com_vel: List, centroidal_momentum: List) -> None:
@@ -233,8 +166,8 @@ class StorageHandler:
             # Smooth the joints postural at the desired frequency
             joints_pos_prev = self.posturals["joints_pos"][-1]
             joints_vel_prev = self.posturals["joints_vel"][-1]
-            smoothed_joints_pos = self.retrieve_smoothed_joints(joints_pos_prev, joints_pos, self.generation_to_control_time_scaling * self.time_scaling)
-            smoothed_joints_vel = self.retrieve_smoothed_joints(joints_vel_prev, joints_vel, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_joints_pos = self.retrieve_smoothed_dict(joints_pos_prev, joints_pos, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_joints_vel = self.retrieve_smoothed_dict(joints_vel_prev, joints_vel, self.generation_to_control_time_scaling * self.time_scaling)
             self.posturals["joints_pos"].extend(smoothed_joints_pos)
             self.posturals["joints_vel"].extend(smoothed_joints_vel)
 
@@ -252,7 +185,7 @@ class StorageHandler:
 
             # Smooth the base position at the desired frequency
             base_pos_prev = self.posturals["base"][-1]["position"].copy()
-            smoothed_base_pos = self.retrieve_smoothed_base_pos(base_pos_prev, base["position"], self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_base_pos = self.retrieve_smoothed_3Dsignal(base_pos_prev, base["position"], self.generation_to_control_time_scaling * self.time_scaling)
 
             # Replicate the base orientation at the desired frequency
             smoothed_base_quat = []
@@ -280,8 +213,8 @@ class StorageHandler:
             # Smooth the com at the desired frequency
             com_pos_prev = self.posturals["com_pos"][-1].copy()
             com_vel_prev = self.posturals["com_vel"][-1].copy()
-            smoothed_com_pos = self.retrieve_smoothed_com(com_pos_prev, com_pos, self.generation_to_control_time_scaling * self.time_scaling)
-            smoothed_com_vel = self.retrieve_smoothed_com(com_vel_prev, com_vel, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_com_pos = self.retrieve_smoothed_3Dsignal(com_pos_prev, com_pos, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_com_vel = self.retrieve_smoothed_3Dsignal(com_vel_prev, com_vel, self.generation_to_control_time_scaling * self.time_scaling)
             self.posturals["com_pos"].extend(smoothed_com_pos)
             self.posturals["com_vel"].extend(smoothed_com_vel)
 
@@ -297,9 +230,19 @@ class StorageHandler:
 
         else:
 
-            # Smooth the centroidal_momentum at the desired frequency
+            # Retrieve linear and angular momentum
             centroidal_momentum_prev = self.posturals["centroidal_momentum"][-1].copy()
-            smoothed_centroidal_momentum = self.retrieve_smoothed_centroidal_momentum(centroidal_momentum_prev, centroidal_momentum, self.generation_to_control_time_scaling * self.time_scaling)
+            linear_momentum_prev = centroidal_momentum_prev[0]
+            angular_momentum_prev = centroidal_momentum_prev[1]
+            linear_momentum_next = centroidal_momentum[0]
+            angular_momentum_next = centroidal_momentum[1]
+
+            # Smooth linear and angular momentum at the desired frequency
+            smoothed_linear_momentum = self.retrieve_smoothed_3Dsignal(linear_momentum_prev, linear_momentum_next, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_angular_momentum = self.retrieve_smoothed_3Dsignal(angular_momentum_prev, angular_momentum_next, self.generation_to_control_time_scaling * self.time_scaling)
+
+            # Retrieve smoothed centroidal momentum
+            smoothed_centroidal_momentum = [[smoothed_linear_momentum[k], smoothed_angular_momentum[k]] for k in range(len(smoothed_linear_momentum))]
             self.posturals["centroidal_momentum"].extend(smoothed_centroidal_momentum)
 
     def save_data_as_json(self) -> None:
