@@ -200,7 +200,7 @@ with tf.Session(config=config) as sess:
                                                                         blending_coefficients=blending_coefficients)
 
         # Apply the joint positions and the base orientation from the network output
-        joint_positions, new_base_quaternion = generator.apply_joint_positions_and_base_orientation(
+        joint_positions, joint_velocities, new_base_quaternion = generator.apply_joint_positions_and_base_orientation(
             denormalized_current_output=denormalized_current_output,
             base_pitch_offset=base_pitch_offset)
 
@@ -211,8 +211,10 @@ with tf.Session(config=config) as sess:
             generator.update_support_vertex_position()
 
             # Compute kinematically-feasible base position and updated posturals
-            new_base_postural, new_joints_postural, new_links_postural, new_com_postural = \
+            new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
+            new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural = \
                 generator.compute_kinematically_fasible_base_and_update_posturals(joint_positions=joint_positions,
+                                                                                  joint_velocities=joint_velocities,
                                                                                   base_quaternion=new_base_quaternion,
                                                                                   controlled_joints=controlled_joints,
                                                                                   link_names=icub.link_names())
@@ -228,8 +230,10 @@ with tf.Session(config=config) as sess:
                                                 new_footstep=generator.storage.footsteps[support_foot][-1])
 
         # Compute kinematically-feasible base position and updated posturals
-        new_base_postural, new_joints_postural, new_links_postural, new_com_postural = \
+        new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
+        new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural = \
             generator.compute_kinematically_fasible_base_and_update_posturals(joint_positions=joint_positions,
+                                                                              joint_velocities=joint_velocities,
                                                                               base_quaternion=new_base_quaternion,
                                                                               controlled_joints=controlled_joints,
                                                                               link_names=icub.link_names())
@@ -253,9 +257,12 @@ with tf.Session(config=config) as sess:
         # Update storage and periodically save data
         generator.update_storages_and_save(blending_coefficients=current_blending_coefficients,
                                            base_postural=new_base_postural,
-                                           joints_postural=new_joints_postural,
+                                           joints_pos_postural=new_joints_pos_postural,
+                                           joint_vel_postural=new_joints_vel_postural,
                                            links_postural=new_links_postural,
-                                           com_postural=new_com_postural,
+                                           com_pos_postural=new_com_pos_postural,
+                                           com_vel_postural=new_com_vel_postural,
+                                           centroidal_momentum_postural=new_centroidal_momentum_postural,
                                            raw_data=raw_data,
                                            quad_bezier=quad_bezier,
                                            base_velocities=base_velocities,
