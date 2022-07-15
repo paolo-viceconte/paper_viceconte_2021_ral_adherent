@@ -50,6 +50,7 @@ parser.add_argument("--plot_footsteps", help="Visualize the footsteps.", action=
 parser.add_argument("--plot_blending_coefficients", help="Visualize blending coefficient activations.", action="store_true")
 parser.add_argument("--time_scaling", help="Time scaling to be applied to the generated trajectory. Keep it integer.",
                     type=int, default=1)
+parser.add_argument("--plot_contacts", help="Visualize the contacts extracted for the controller.", action="store_true")
 
 args = parser.parse_args()
 
@@ -60,6 +61,7 @@ plot_trajectory_blending = args.plot_trajectory_blending
 plot_footsteps = args.plot_footsteps
 plot_blending_coefficients = args.plot_blending_coefficients
 time_scaling = args.time_scaling
+plot_contacts = args.plot_contacts
 
 # ==================
 # YARP CONFIGURATION
@@ -267,7 +269,8 @@ with tf.Session(config=config) as sess:
                                            quad_bezier=quad_bezier,
                                            base_velocities=base_velocities,
                                            facing_dirs=facing_dirs,
-                                           save_every_N_iterations=save_every_N_iterations)
+                                           save_every_N_iterations=save_every_N_iterations,
+                                           plot_contacts=plot_contacts)
 
         if plot_trajectory_blending:
 

@@ -598,8 +598,8 @@ def define_initial_support_foot_and_vertex(robot: str) -> List:
         initial_support_vertex = 0
 
     elif robot == "iCubV3":
-        initial_support_foot = "left_foot"
-        initial_support_vertex = 1
+        initial_support_foot = "right_foot"
+        initial_support_vertex = 0
 
     else:
         raise Exception("Initial support foot and vertex only defined for iCubV2_5 and iCubV3.")
