@@ -440,6 +440,7 @@ class FootstepsExtractor:
     # Auxiliary variables for the footsteps update before saving
     nominal_DS_duration: float
     difference_position_threshold: float
+    difference_time_threshold: float
 
     # Auxiliary variables to handle the footsteps deactivation time
     difference_height_norm_threshold: bool
@@ -450,12 +451,17 @@ class FootstepsExtractor:
               time_scaling: int = 1,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
+              difference_time_threshold: float = 0.25, # TODO: tune
               difference_height_norm_threshold: bool = 0.005) -> "FootstepsExtractor":
         """Build an instance of FootstepsExtractor."""
+
+        # Scale the time threshold for close footsteps depending on the time scaling of the entire trajectory
+        scaled_difference_time_threshold = time_scaling * difference_time_threshold
 
         return FootstepsExtractor(feet_frames=feet_frames,
                                   nominal_DS_duration=nominal_DS_duration,
                                   difference_position_threshold=difference_position_threshold,
+                                  difference_time_threshold=scaled_difference_time_threshold,
                                   difference_height_norm_threshold=difference_height_norm_threshold,
                                   time_scaling=time_scaling)
 
@@ -571,7 +577,7 @@ class FootstepsExtractor:
         return footsteps
 
     def merge_close_footsteps(self, final_deactivation_time: float, footsteps: Dict) -> Dict:
-        """Merge footsteps that are too close each other in order to avoid unintended footsteps on the spot."""
+        """Merge footsteps that are too close each other (in terms of space and time) to avoid unintended footsteps on the spot."""
 
         # Initialize updated footsteps list
         updated_footsteps = {self.feet_frames["left_foot"]: [], self.feet_frames["right_foot"]: []}
@@ -592,9 +598,15 @@ class FootstepsExtractor:
                 next_footstep_position = np.array(footsteps[foot][i + 1]["2D_pos"])
                 difference_position = np.linalg.norm(current_footstep_position - next_footstep_position)
 
-                if difference_position >= self.difference_position_threshold:
+                # Compute the difference in time between consecutive footsteps of the same foot
+                current_footstep_deactivation = np.array(footsteps[foot][i]["deactivation_time"])
+                next_footstep_activation = np.array(footsteps[foot][i + 1]["activation_time"])
+                difference_time = next_footstep_activation - current_footstep_deactivation
 
-                    # Do not update footsteps which are not enough close each other
+                if difference_position >= self.difference_position_threshold or \
+                        (difference_position < self.difference_position_threshold and difference_time >= self.difference_time_threshold):
+
+                    # Do not update footsteps which are not enough close each other (in terms of both time and space)
                     updated_footsteps[foot].append(footsteps[foot][i])
 
                 else:
