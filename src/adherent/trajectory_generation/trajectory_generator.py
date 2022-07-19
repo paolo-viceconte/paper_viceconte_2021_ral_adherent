@@ -515,7 +515,7 @@ class FootstepsExtractor:
         new_footstep["2D_orient"] = W_RPY_SF[2]
 
         # Assign new footstep activation time
-        new_footstep["activation_time"] = activation_time * self.time_scaling
+        new_footstep["activation_time"] = activation_time
 
         # Use a temporary flag indicating that the deactivation time has not been computed yet
         new_footstep["deactivation_time"] = -1
@@ -533,8 +533,7 @@ class FootstepsExtractor:
         # Update the deactivation time of the last footstep of each foot (they need to coincide to be processed
         # properly in the trajectory control layer)
         for foot in footsteps.keys():
-            footsteps[foot][-1]["deactivation_time"] = final_deactivation_time * self.time_scaling
-
+            footsteps[foot][-1]["deactivation_time"] = final_deactivation_time
         # Replace temporary deactivation times in the footsteps list (if any)
         updated_footsteps = self.replace_temporary_deactivation_times(footsteps=footsteps)
 
@@ -569,7 +568,7 @@ class FootstepsExtractor:
                         if other_foot_activation_time > current_activation_time:
 
                             # Update the deactivation time so to have a double support (DS) phase of the nominal duration
-                            current_deactivation_time = other_foot_activation_time + self.nominal_DS_duration * self.time_scaling
+                            current_deactivation_time = other_foot_activation_time + self.nominal_DS_duration
                             footstep["deactivation_time"] = current_deactivation_time
 
                             break
