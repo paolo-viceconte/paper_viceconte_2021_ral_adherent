@@ -692,6 +692,7 @@ class KinematicComputations:
     # Support foot and support vertex related quantities
     local_foot_vertices_pos: List
     feet_frames: Dict
+    feet_links: Dict
     support_foot_prev: str
     support_foot: str
     support_vertex_prev: int
@@ -704,6 +705,7 @@ class KinematicComputations:
     def build(kindyn: kindyncomputations.KinDynComputations,
               local_foot_vertices_pos: List,
               feet_frames: Dict,
+              feet_links: Dict,
               icub: iCub,
               gazebo: scenario.GazeboSimulator,
               initial_support_foot: str,
@@ -727,6 +729,7 @@ class KinematicComputations:
                                      postural_extractor=postural_extractor,
                                      local_foot_vertices_pos=local_foot_vertices_pos,
                                      feet_frames=feet_frames,
+                                     feet_links=feet_links,
                                      support_foot_prev=feet_frames[initial_support_foot],
                                      support_foot=feet_frames[initial_support_foot],
                                      support_vertex_prev=initial_support_vertex,
@@ -812,11 +815,19 @@ class KinematicComputations:
                                   base_quaternion: List) -> None:
         """Reset the robot configuration."""
 
+        # Retrieve the transformation from the world frame to the base frame
         world_H_base = numpy.FromNumPy.to_idyntree_transform(
             position=np.array(base_position),
             quaternion=np.array(base_quaternion)).asHomogeneousTransform().toNumPy()
 
-        self.kindyn.set_robot_state(s=joint_positions, ds=joint_velocities, world_H_base=world_H_base)
+        # Extract the base velocity by imposing the holonomic constraint on the current support foot
+        jacobian_SF = self.kindyn.get_frame_jacobian(self.feet_links[self.support_foot])
+        jacobian_SF_base = jacobian_SF[:, :6]
+        jacobian_SF_joints = jacobian_SF[:, 6:]
+        base_velocity = - np.linalg.inv(jacobian_SF_base).dot(jacobian_SF_joints.dot(joint_velocities))
+
+        # Set the robot state using the base velocity retrieved by legged odometry
+        self.kindyn.set_robot_state(s=joint_positions, ds=joint_velocities, world_H_base=world_H_base, base_velocity=base_velocity)
 
     def reset_visual_robot_configuration(self,
                                          joint_positions: List = None,
@@ -1751,6 +1762,7 @@ class TrajectoryGenerator:
               training_path: str,
               local_foot_vertices_pos: List,
               feet_frames: Dict,
+              feet_links: Dict,
               initial_nn_X: List,
               initial_past_trajectory_base_pos: List,
               initial_past_trajectory_facing_dirs: List,
@@ -1782,6 +1794,7 @@ class TrajectoryGenerator:
         kincomputations = KinematicComputations.build(kindyn=kindyn,
                                                       local_foot_vertices_pos=local_foot_vertices_pos,
                                                       feet_frames=feet_frames,
+                                                      feet_links=feet_links,
                                                       icub=icub,
                                                       gazebo=gazebo,
                                                       initial_support_foot=initial_support_foot,

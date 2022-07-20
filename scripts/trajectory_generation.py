@@ -18,9 +18,9 @@ from adherent.data_processing.utils import iCub
 from gym_ignition.utils.scenario import init_gazebo_sim
 from gym_ignition.rbd.idyntree import kindyncomputations
 from adherent.data_processing.utils import define_foot_vertices
-from adherent.data_processing.utils import define_feet_frames
 from adherent.trajectory_generation import trajectory_generator
 from adherent.trajectory_generation.utils import define_initial_nn_X
+from adherent.data_processing.utils import define_feet_frames_and_links
 from adherent.trajectory_generation.utils import define_initial_base_yaw
 from adherent.data_processing.utils import define_frontal_base_direction
 from adherent.data_processing.utils import define_frontal_chest_direction
@@ -151,8 +151,8 @@ initial_base_yaw = define_initial_base_yaw(robot="iCubV3")
 frontal_base_dir = define_frontal_base_direction(robot="iCubV3")
 frontal_chest_dir = define_frontal_chest_direction(robot="iCubV3")
 
-# Define robot-specific feet frames
-feet_frames = define_feet_frames(robot="iCubV3")
+# Define robot-specific feet frames and links
+feet_frames, feet_links = define_feet_frames_and_links(robot="iCubV3")
 
 # Define robot-specific initial support foot and vertex
 initial_support_foot, initial_support_vertex = define_initial_support_foot_and_vertex(robot="iCubV3")
@@ -163,6 +163,7 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
                                                            training_path=os.path.join(script_directory, training_path),
                                                            local_foot_vertices_pos=local_foot_vertices_pos,
                                                            feet_frames=feet_frames,
+                                                           feet_links=feet_links,
                                                            initial_nn_X=initial_nn_X,
                                                            initial_past_trajectory_base_pos=initial_past_trajectory_base_pos,
                                                            initial_past_trajectory_facing_dirs=initial_past_trajectory_facing_dirs,
