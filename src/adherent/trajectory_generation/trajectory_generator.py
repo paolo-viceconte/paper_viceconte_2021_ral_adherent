@@ -160,12 +160,15 @@ class StorageHandler:
         # JOINTS
         # ======
 
+        # Scale the joint velocities according to the time scaling of the generated trajectory
+        joints_vel_scaled = {joint: 1/self.time_scaling * joints_vel[joint] for joint in joints_vel}
+
         if self.posturals["joints_pos"] == []:
 
             # Replicate the joints postural at the first iteration
             for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
                 self.posturals["joints_pos"].append(joints_pos)
-                self.posturals["joints_vel"].append(joints_vel)
+                self.posturals["joints_vel"].append(joints_vel_scaled)
 
         else:
 
@@ -173,7 +176,7 @@ class StorageHandler:
             joints_pos_prev = self.posturals["joints_pos"][-1]
             joints_vel_prev = self.posturals["joints_vel"][-1]
             smoothed_joints_pos = self.retrieve_smoothed_dict(joints_pos_prev, joints_pos, self.generation_to_control_time_scaling * self.time_scaling)
-            smoothed_joints_vel = self.retrieve_smoothed_dict(joints_vel_prev, joints_vel, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_joints_vel = self.retrieve_smoothed_dict(joints_vel_prev, joints_vel_scaled, self.generation_to_control_time_scaling * self.time_scaling)
             self.posturals["joints_pos"].extend(smoothed_joints_pos)
             self.posturals["joints_vel"].extend(smoothed_joints_vel)
 
@@ -207,12 +210,15 @@ class StorageHandler:
         # COM
         # ===
 
+        # Scale the CoM velocity according to the time scaling of the generated trajectory
+        com_vel_scaled = list(1/self.time_scaling * np.array(com_vel))
+
         if self.posturals["com_pos"] == []:
 
             # Replicate the com at the first iteration
             for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
                 self.posturals["com_pos"].append(com_pos)
-                self.posturals["com_vel"].append(com_vel)
+                self.posturals["com_vel"].append(com_vel_scaled)
 
         else:
 
@@ -220,7 +226,7 @@ class StorageHandler:
             com_pos_prev = self.posturals["com_pos"][-1].copy()
             com_vel_prev = self.posturals["com_vel"][-1].copy()
             smoothed_com_pos = self.retrieve_smoothed_3Dsignal(com_pos_prev, com_pos, self.generation_to_control_time_scaling * self.time_scaling)
-            smoothed_com_vel = self.retrieve_smoothed_3Dsignal(com_vel_prev, com_vel, self.generation_to_control_time_scaling * self.time_scaling)
+            smoothed_com_vel = self.retrieve_smoothed_3Dsignal(com_vel_prev, com_vel_scaled, self.generation_to_control_time_scaling * self.time_scaling)
             self.posturals["com_pos"].extend(smoothed_com_pos)
             self.posturals["com_vel"].extend(smoothed_com_vel)
 
@@ -228,11 +234,15 @@ class StorageHandler:
         # CENTROIDAL MOMENTUM
         # ===================
 
+        # Scale the centroidal momentum according to the time scaling of the generated trajectory
+        centroidal_momentum_scaled = [list(1/self.time_scaling * np.array(centroidal_momentum[0])),
+                                      list(1/self.time_scaling * np.array(centroidal_momentum[1]))]
+
         if self.posturals["centroidal_momentum"] == []:
 
             # Replicate the centroidal_momentum at the first iteration
             for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
-                self.posturals["centroidal_momentum"].append(centroidal_momentum)
+                self.posturals["centroidal_momentum"].append(centroidal_momentum_scaled)
 
         else:
 
@@ -240,8 +250,8 @@ class StorageHandler:
             centroidal_momentum_prev = self.posturals["centroidal_momentum"][-1].copy()
             linear_momentum_prev = centroidal_momentum_prev[0]
             angular_momentum_prev = centroidal_momentum_prev[1]
-            linear_momentum_next = centroidal_momentum[0]
-            angular_momentum_next = centroidal_momentum[1]
+            linear_momentum_next = centroidal_momentum_scaled[0]
+            angular_momentum_next = centroidal_momentum_scaled[1]
 
             # Smooth linear and angular momentum at the desired frequency
             smoothed_linear_momentum = self.retrieve_smoothed_3Dsignal(linear_momentum_prev, linear_momentum_next, self.generation_to_control_time_scaling * self.time_scaling)
