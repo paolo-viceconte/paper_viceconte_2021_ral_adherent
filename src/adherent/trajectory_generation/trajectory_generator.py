@@ -1,6 +1,11 @@
 # SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia
 # SPDX-License-Identifier: BSD-3-Clause
 
+import torch
+from torch import nn
+from adherent.MANN_pytorch.MANN import MANN
+
+# TODO: remove
 # Use tf version 2.3.0 as 1.x
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -8,6 +13,7 @@ tf.disable_v2_behavior()
 import os
 import math
 import json
+import time
 import yarp
 import numpy as np
 from typing import List, Dict
@@ -26,6 +32,7 @@ from adherent.trajectory_generation.utils import trajectory_blending
 from adherent.trajectory_generation.utils import load_output_mean_and_std
 from adherent.trajectory_generation.utils import compute_angle_wrt_x_positive_semiaxis
 from adherent.trajectory_generation.utils import load_component_wise_input_mean_and_std
+from adherent.MANN_pytorch.utils import get_latest_model_path
 
 import matplotlib as mpl
 mpl.rcParams['toolbar'] = 'None'
@@ -858,6 +865,9 @@ class LearnedModel:
     # Path to the learned model
     model_path: str
 
+    # Learned model
+    learned_model: None
+
     # Output mean and standard deviation
     Ymean: List
     Ystd: List
@@ -866,60 +876,23 @@ class LearnedModel:
     def build(training_path: str) -> "LearnedModel":
         """Build an instance of LearnedModel."""
 
-        # Retrieve path to the learned model
-        model_path = os.path.join(training_path, "model/")
+        # Retrieve path to the latest saved model
+        model_path = get_latest_model_path(training_path+"models/")
+
+        # Restore the model with the trained weights
+        learned_model = torch.load(model_path)
+
+        # TODO: doublecheck that this sets dropout to zero
+        # Set dropout and batch normalization layers to evaluation mode before running inference
+        learned_model.eval()
 
         # Compute output mean and standard deviation
         datapath = os.path.join(training_path, "normalization/")
         Ymean, Ystd = load_output_mean_and_std(datapath)
 
-        return LearnedModel(model_path=model_path, Ymean=Ymean, Ystd=Ystd)
+        return LearnedModel(model_path=model_path, learned_model=learned_model, Ymean=Ymean, Ystd=Ystd)
 
-    def restore_learned_model(self, session: tf.Session) -> tf.Graph:
-        """Restore the learned model."""
-
-        # Restore the network generator
-        saver = tf.train.import_meta_graph(self.model_path + "/model.ckpt.meta")
-        saver.restore(session, tf.train.latest_checkpoint(self.model_path))
-
-        # Retrieve the graph
-        graph = tf.get_default_graph()
-
-        return graph
-
-    @staticmethod
-    def retrieve_tensors(graph: tf.Graph) -> (tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor):
-        """Retrieve the tensors associated to the quantities of interest."""
-
-        # Placeholder to feed the input X
-        nn_X = graph.get_tensor_by_name("nn_X:0")
-
-        # Placeholder to feed the dropout probability
-        nn_keep_prob = graph.get_tensor_by_name("nn_keep_prob:0")
-
-        # Tensor containing the network output
-        output = graph.get_tensor_by_name('Squeeze:0')
-
-        # Tensor containing the blending coefficients
-        blending_coefficients = graph.get_tensor_by_name('Softmax:0')
-
-        return nn_X, nn_keep_prob, output, blending_coefficients
-
-    @staticmethod
-    def evaluate_tensors(nn_X: tf.Tensor, current_nn_X: List, nn_keep_prob: tf.Tensor, output: tf.Tensor,
-                         blending_coefficients: tf.Tensor) -> (np.array, np.array):
-        """Evaluate the tensors associated to the quantities of interest."""
-
-        # Pass the input defined at the previous iteration to the network (no dropout at inference time)
-        feed_dict = {nn_X: current_nn_X, nn_keep_prob: 1.0}
-
-        # Extract the output from the network
-        current_output = output.eval(feed_dict=feed_dict)
-
-        # Extract the blending coefficients from the network
-        current_blending_coefficients = blending_coefficients.eval(feed_dict=feed_dict)
-
-        return current_output, current_blending_coefficients
+    # TODO: add methods here?
 
 
 @dataclass
@@ -1449,32 +1422,16 @@ class TrajectoryGenerator:
                                    plotter=plotter,
                                    model=model)
 
-    def restore_model_and_retrieve_tensors(self, session: tf.Session) -> (tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor):
-        """Restore the learned model and retrieve the tensors of interest."""
+    def retrieve_network_output_pytorch(self) -> (np.array, np.array):
+        """Retrieve the network output (also denormalized)."""
 
-        # Restore the learned model
-        graph = self.model.restore_learned_model(session=session)
-
-        # Retrieve the tensors of interest
-        nn_X, nn_keep_prob, output, blending_coefficients = self.model.retrieve_tensors(graph)
-
-        return nn_X, nn_keep_prob, output, blending_coefficients
-
-    def retrieve_network_output_and_blending_coefficients(self, nn_X: tf.Tensor, nn_keep_prob: tf.Tensor, output: tf.Tensor,
-                                                          blending_coefficients: tf.Tensor) -> (np.array, np.array, np.array):
-        """Retrieve the network output (also denormalized) and the blending coefficients."""
-
-        # Retrieve the network output and the blending coefficients
-        current_output, current_blending_coefficients = self.model.evaluate_tensors(nn_X=nn_X,
-                                                                                    current_nn_X=self.autoregression.current_nn_X,
-                                                                                    nn_keep_prob=nn_keep_prob,
-                                                                                    output=output,
-                                                                                    blending_coefficients=blending_coefficients)
+        # Retrieve the network output
+        current_output = self.model.learned_model.inference(torch.tensor(self.autoregression.current_nn_X)).numpy()
 
         # Denormalize the network output
         denormalized_current_output = denormalize(current_output, self.model.Ymean, self.model.Ystd)[0]
 
-        return current_output, denormalized_current_output, current_blending_coefficients
+        return current_output, denormalized_current_output
 
     def apply_joint_positions_and_base_orientation(self, denormalized_current_output: List) -> (List, List):
         """Apply joint positions and base orientation from the output returned by the network."""
@@ -1638,8 +1595,9 @@ class TrajectoryGenerator:
                                  base_velocities: List, facing_dirs: List, save_every_N_iterations: int) -> None:
         """Update the blending coefficients, posturals and joystick input storages and periodically save data."""
 
+        # TODO: temporary fix to ignore the storage of the blending coefficients
         # Update the blending coefficients storage
-        self.storage.update_blending_coefficients_storage(blending_coefficients=blending_coefficients)
+        # self.storage.update_blending_coefficients_storage(blending_coefficients=blending_coefficients)
 
         # Update the posturals storage
         self.storage.update_posturals_storage(base=base_postural, joints=joints_postural,
