@@ -45,8 +45,8 @@ class MANN(nn.Module):
     def train_loop(self, loss_fn, optimizer, epoch, writer):
         """Run one epoch of training."""
 
-        # Dataset dimension
-        size = len(self.train_dataloader.dataset)
+        # Total number of batches
+        total_batches = int(len(self.train_dataloader))
 
         # Cumulative loss
         cumulative_loss = 0
@@ -68,12 +68,11 @@ class MANN(nn.Module):
 
             # Periodically print the current average loss
             if batch % 1000 == 0:
-                current = (batch+1) * len(X)
-                current_avg_loss = cumulative_loss/current
-                print(f"avg loss: {current_avg_loss:>7f}  [{current:>5d}/{size:>5d}]")
+                current_avg_loss = cumulative_loss/(batch+1)
+                print(f"avg loss: {current_avg_loss:>7f}  [{batch:>5d}/{total_batches:>5d}]")
 
         # Print and store the average loss of the current epoch
-        avg_loss = cumulative_loss/size
+        avg_loss = cumulative_loss/total_batches
         print("Final avg loss:", avg_loss)
         writer.add_scalar('Loss/avg_training_loss_per_epoch', avg_loss, epoch)
         writer.flush()

@@ -73,7 +73,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
 # Define the loss function
-loss_fn = nn.MSELoss(reduction='sum') # TODO: sum or average?
+loss_fn = nn.MSELoss(reduction="mean")
 
 # Initialize the optimizer
 optimizer = torch.optim.AdamW(mann.parameters(), lr=learning_rate_ini, weight_decay=weightDecay_ini)

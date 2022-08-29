@@ -882,7 +882,6 @@ class LearnedModel:
         # Restore the model with the trained weights
         learned_model = torch.load(model_path)
 
-        # TODO: doublecheck that this sets dropout to zero
         # Set dropout and batch normalization layers to evaluation mode before running inference
         learned_model.eval()
 
