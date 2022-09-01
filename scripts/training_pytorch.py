@@ -1,5 +1,6 @@
 import torch
 import argparse
+import numpy as np
 from torch import nn
 from torch.utils.data import DataLoader
 from adherent.MANN_pytorch.MANN import MANN
@@ -44,17 +45,20 @@ batch_size = 32
 dropout_probability = 0.3
 gn_hidden_size = 32
 mpn_hidden_size = 512
-epochs = 100
-# TODO: are lr and wd ok even if we do not reset them?
+epochs = 150
+Te = 10
+Tmult = 2
 learning_rate_ini = 0.0001
 weightDecay_ini = 0.0025
-# TODO: additional parameters to reset the lr and wd, not used for the time being
-# Te = 10
-# Tmult = 2
+Te_cumulative = Te
 
 # Configure the datasets for training and testing
 train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(testing_data, batch_size=batch_size, shuffle=True)
+
+# Normalize weight decay # TODO: check
+total_batches = int(len(train_dataloader))
+weightDecay_ini = weightDecay_ini / (np.power(total_batches * Te, 0.5))
 
 # Initialize the MANN architecture
 mann = MANN(train_dataloader=train_dataloader,
@@ -78,6 +82,12 @@ loss_fn = nn.MSELoss(reduction="mean")
 # Initialize the optimizer
 optimizer = torch.optim.AdamW(mann.parameters(), lr=learning_rate_ini, weight_decay=weightDecay_ini)
 
+# Initialize learning rate and weight decay schedulers
+fake_lr_optimizer = torch.optim.AdamW(mann.parameters(), lr=learning_rate_ini)
+fake_wd_optimizer = torch.optim.AdamW(mann.parameters(), lr=weightDecay_ini)
+lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_lr_optimizer, T_max=Te)
+wd_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_wd_optimizer, T_max=Te)
+
 # Configure tensorboard writer
 writer_path = data_handler.get_savepath() + "/logs/"
 create_path([writer_path])
@@ -100,6 +110,21 @@ for epoch in range(epochs):
         current_model_path = model_path + "/model_" + str(epoch) + ".pth"
         torch.save(mann, current_model_path)
         last_model_path = current_model_path
+
+    # Update current learning rate and weight decay
+    lr_scheduler.step()
+    wd_scheduler.step()
+    optimizer.param_groups[0]['lr'] = lr_scheduler.get_last_lr()[0]
+    optimizer.param_groups[0]['weight_decay'] = wd_scheduler.get_last_lr()[0]
+
+    # Reinitialize learning rate and weight decay
+    if epoch == Te_cumulative - 1:
+        Te = Tmult * Te
+        Te_cumulative += Te
+        fake_lr_optimizer = torch.optim.AdamW(mann.parameters(), lr=learning_rate_ini)
+        fake_wd_optimizer = torch.optim.AdamW(mann.parameters(), lr=weightDecay_ini)
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_lr_optimizer, T_max=Te)
+        wd_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_wd_optimizer, T_max=Te)
 
 writer.close()
 

@@ -51,6 +51,10 @@ class MANN(nn.Module):
         # Cumulative loss
         cumulative_loss = 0
 
+        # Print the learning rate and weight decay of the current epoch
+        print('Current lr:',optimizer.param_groups[0]['lr'])
+        print('Current wd:',optimizer.param_groups[0]['weight_decay'])
+
         # Iterate over batches
         for batch, (X, y) in enumerate(self.train_dataloader):
 
@@ -71,10 +75,14 @@ class MANN(nn.Module):
                 current_avg_loss = cumulative_loss/(batch+1)
                 print(f"avg loss: {current_avg_loss:>7f}  [{batch:>5d}/{total_batches:>5d}]")
 
-        # Print and store the average loss of the current epoch
+        # Print the average loss of the current epoch
         avg_loss = cumulative_loss/total_batches
         print("Final avg loss:", avg_loss)
+
+        # Store the average loss, learning rate and weight decay of the current epoch
         writer.add_scalar('Loss/avg_training_loss_per_epoch', avg_loss, epoch)
+        writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
+        writer.add_scalar('wd', optimizer.param_groups[0]['weight_decay'], epoch)
         writer.flush()
 
     def test_loop(self, loss_fn, epoch=None, writer=None):
@@ -102,7 +110,6 @@ class MANN(nn.Module):
             writer.add_scalar('Loss/avg_test_loss_per_epoch', avg_test_loss, epoch)
             writer.flush()
 
-    # TODO: make sure that here dropout is not used
     def inference(self, x):
         """Inference step on the given input x."""
 
