@@ -1,7 +1,6 @@
 import os
 import glob
 import json
-import wget
 import os.path
 import numpy as np
 from typing import List, Dict
@@ -28,6 +27,7 @@ def get_dataset_portions(dataset: str) -> Dict:
 
     return portions
 
+
 def get_latest_model_path(models_path: str) -> str:
     """Retrieve the path of the latest saved model."""
 
@@ -37,12 +37,14 @@ def get_latest_model_path(models_path: str) -> str:
 
     return latest_model
 
+
 def create_path(path: List) -> None:
     """Create a path if it does not exist."""
 
     for subpath in path:
         if not os.path.exists(subpath):
             os.makedirs(subpath)
+
 
 def normalize(X: np.array, axis: int) -> np.array:
     """Normalize X along the given axis."""
@@ -53,13 +55,14 @@ def normalize(X: np.array, axis: int) -> np.array:
 
     # Avoid division by zero
     for elem in range(Xstd.size):
-        if (Xstd[elem] == 0):
+        if Xstd[elem] == 0:
             Xstd[elem] = 1
 
     # Normalize
     X = (X - Xmean) / Xstd
 
     return X
+
 
 def denormalize(X: np.array, Xmean: np.array, Xstd: np.array) -> np.array:
     """Denormalize X, given its mean and std."""
@@ -69,11 +72,13 @@ def denormalize(X: np.array, Xmean: np.array, Xstd: np.array) -> np.array:
 
     return X
 
+
 def store_in_file(data: list, filename: str) -> None:
     """Store data in file as json."""
 
     with open(filename, 'w') as outfile:
         json.dump(data, outfile)
+
 
 def read_from_file(filename: str) -> np.array:
     """Read data as json from file."""

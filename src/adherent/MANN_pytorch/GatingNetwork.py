@@ -2,10 +2,12 @@ import torch
 import numpy as np
 from torch import nn
 
+
 class GatingNetwork(nn.Module):
     """Class for the Gating Network included in the MANN architecture."""
 
     def __init__(self, input_size, output_size, hidden_size, dropout_probability):
+        """Gating Network constructor."""
 
         # Superclass constructor
         super(GatingNetwork, self).__init__()
@@ -23,7 +25,7 @@ class GatingNetwork(nn.Module):
         b1 = torch.zeros(self.hidden_size, 1)
         b2 = torch.zeros(self.output_size, 1)
 
-        # Intialization
+        # Initialization
         w0 = self.initialize_gn_weights(w0)
         w1 = self.initialize_gn_weights(w1)
         w2 = self.initialize_gn_weights(w2)
@@ -36,12 +38,13 @@ class GatingNetwork(nn.Module):
         self.b1 = nn.Parameter(b1)
         self.b2 = nn.Parameter(b2)
 
-        # Activation funcitons and layers to be exploited in the forward call
+        # Activation functions and layers to be exploited in the forward call
         self.elu = nn.ELU()
         self.dropout = nn.Dropout(p=dropout_probability)
         self.softmax = nn.Softmax(dim=0)
 
     def forward(self, x):
+        """Gating Network 3-layers architecture."""
 
         # Input processing
         x = self.dropout(x)
@@ -64,14 +67,10 @@ class GatingNetwork(nn.Module):
 
         return H2
 
-    def initialize_gn_weights(self, w):
-        """Initialize the Gating Network weights using uniform distribution."""
+    @staticmethod
+    def initialize_gn_weights(w):
+        """Initialize the Gating Network weights using uniform distribution with
+        bounds defined on the basis of the dimensions of the network layers."""
 
         bound = np.sqrt(6. / np.sum(w.shape[-2:]))
         return w.uniform_(-bound, bound)
-
-
-
-
-
-

@@ -1,12 +1,13 @@
-import math
 import torch
 import numpy as np
 from torch import nn
+
 
 class MotionPredictionNetwork(nn.Module):
     """Class for the Motion Prediction Network included in the MANN architecture."""
 
     def __init__(self, num_experts, input_size, output_size, hidden_size, dropout_probability):
+        """Motion Prediction Network constructor."""
 
         # Superclass constructor
         super(MotionPredictionNetwork, self).__init__()
@@ -25,7 +26,7 @@ class MotionPredictionNetwork(nn.Module):
         b1 = torch.zeros(self.num_experts, self.hidden_size, 1)
         b2 = torch.zeros(self.num_experts, self.output_size, 1)
 
-        # Intialization
+        # Initialization
         w0 = self.initialize_mpn_weights(w0)
         w1 = self.initialize_mpn_weights(w1)
         w2 = self.initialize_mpn_weights(w2)
@@ -38,14 +39,15 @@ class MotionPredictionNetwork(nn.Module):
         self.b1 = nn.Parameter(b1)
         self.b2 = nn.Parameter(b2)
 
-        # Activation funcitons and layers to be exploited in the forward call
+        # Activation functions and layers to be exploited in the forward call
         self.elu = nn.ELU()
         self.dropout = nn.Dropout(p=dropout_probability)
 
     def forward(self, x, blending_coefficients):
+        """Motion Prediction Network 3-layers architecture."""
 
         # Input processing
-        x = torch.unsqueeze(x,-1)
+        x = torch.unsqueeze(x, -1)
         x = self.dropout(x)
 
         # Layer 1
@@ -66,12 +68,15 @@ class MotionPredictionNetwork(nn.Module):
         blended_w2 = torch.einsum("ij,ikl->jkl", blending_coefficients, self.w2)
         blended_b2 = torch.einsum("ij,ikl->jkl", blending_coefficients, self.b2)
         H2 = torch.matmul(blended_w2, H1) + blended_b2
-        H2 = torch.squeeze(H2,-1)
+        H2 = torch.squeeze(H2, -1)
 
         return H2
 
-    def initialize_mpn_weights(self, w):
-        """Initialize the Motion Prediction Network weights using uniform distribution."""
+    @staticmethod
+    def initialize_mpn_weights(w):
+        """Initialize the Motion Prediction Network weights using uniform distribution
+        with bounds defined on the basis of the dimensions of the network layers."""
 
         bound = np.sqrt(6. / np.prod(w.shape[-2:]))
         return w.uniform_(-bound, bound)
+

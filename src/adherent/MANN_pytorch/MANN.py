@@ -1,13 +1,14 @@
 import torch
-import numpy as np
 from torch import nn
 from adherent.MANN_pytorch.GatingNetwork import GatingNetwork
 from adherent.MANN_pytorch.MotionPredictionNetwork import MotionPredictionNetwork
+
 
 class MANN(nn.Module):
     """Class for the Mode-Adaptive Neural Network."""
 
     def __init__(self, train_dataloader, test_dataloader, num_experts, gn_hidden_size, mpn_hidden_size, dropout_probability):
+        """Mode-Adaptive Neural Network constructor."""
 
         # Superclass constructor
         super(MANN, self).__init__()
@@ -33,6 +34,7 @@ class MANN(nn.Module):
         self.test_dataloader = test_dataloader
 
     def forward(self, x):
+        """Mode-Adaptive Neural Network architecture."""
 
         # Retrieve the output of the Gating Network
         blending_coefficients = self.gn(x.T)
@@ -52,8 +54,8 @@ class MANN(nn.Module):
         cumulative_loss = 0
 
         # Print the learning rate and weight decay of the current epoch
-        print('Current lr:',optimizer.param_groups[0]['lr'])
-        print('Current wd:',optimizer.param_groups[0]['weight_decay'])
+        print('Current lr:', optimizer.param_groups[0]['lr'])
+        print('Current wd:', optimizer.param_groups[0]['weight_decay'])
 
         # Iterate over batches
         for batch, (X, y) in enumerate(self.train_dataloader):
@@ -80,12 +82,12 @@ class MANN(nn.Module):
         print("Final avg loss:", avg_loss)
 
         # Store the average loss, learning rate and weight decay of the current epoch
-        writer.add_scalar('Loss/avg_training_loss_per_epoch', avg_loss, epoch)
+        writer.add_scalar('avg_loss', avg_loss, epoch)
         writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
         writer.add_scalar('wd', optimizer.param_groups[0]['weight_decay'], epoch)
         writer.flush()
 
-    def test_loop(self, loss_fn, epoch=None, writer=None):
+    def test_loop(self, loss_fn):
         """Test the trained model on the test data."""
 
         # Dataset dimension
@@ -101,14 +103,9 @@ class MANN(nn.Module):
                 pred = self(X.float()).double()
                 cumulative_test_loss += loss_fn(pred, y).item()
 
-        # Print and store the average test loss at the current epoch
+        # Print the average test loss at the current epoch
         avg_test_loss = cumulative_test_loss/num_batches
         print(f"Avg test loss: {avg_test_loss:>8f} \n")
-
-        # Tensorboard monitoring
-        if writer is not None and epoch is not None:
-            writer.add_scalar('Loss/avg_test_loss_per_epoch', avg_test_loss, epoch)
-            writer.flush()
 
     def inference(self, x):
         """Inference step on the given input x."""
@@ -117,5 +114,4 @@ class MANN(nn.Module):
             pred = self(x.float()).double()
 
         return pred
-
 

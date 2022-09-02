@@ -1,10 +1,8 @@
 import os
 import json
-import torch
 import numpy as np
-from torch import nn
+from typing import List
 from datetime import datetime
-from typing import List, Dict
 from torch.utils.data import Dataset
 from adherent.MANN_pytorch.utils import get_dataset_portions, create_path, normalize, store_in_file
 
@@ -31,7 +29,7 @@ class CustomDataset(Dataset):
         return len(self.Y[0])
 
 
-class DataHandler():
+class DataHandler:
     """Class for processing the data in order to get the training and testing sets."""
 
     def __init__(self, datasets: List, mirroring: bool, training_set_percentage: int):
@@ -46,7 +44,8 @@ class DataHandler():
         # Define the training and testing data
         self.training_data, self.testing_data = self.define_training_and_testing_data(training_set_percentage)
 
-    def define_input_and_output_paths(self, datasets: List, mirroring: bool) -> (List, List):
+    @staticmethod
+    def define_input_and_output_paths(datasets: List, mirroring: bool) -> (List, List):
         """Given the datasets and the mirroring flag, retrieve the list of input and output filenames."""
 
         script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -95,7 +94,8 @@ class DataHandler():
 
         return input_paths, output_paths
 
-    def define_savepath(self, datasets: List, mirroring: bool) -> str:
+    @staticmethod
+    def define_savepath(datasets: List, mirroring: bool) -> str:
         """Given the datasets and the mirroring flag, retrieve the storage path."""
 
         script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -214,3 +214,4 @@ class DataHandler():
         """Getter of the testing dataset."""
 
         return self.testing_data
+

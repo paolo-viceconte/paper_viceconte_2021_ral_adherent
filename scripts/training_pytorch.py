@@ -56,7 +56,7 @@ Te_cumulative = Te
 train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=False)
 test_dataloader = DataLoader(testing_data, batch_size=batch_size, shuffle=False)
 
-# Normalize weight decay # TODO: check
+# Normalize weight decay
 total_batches = int(len(train_dataloader))
 weightDecay_ini = weightDecay_ini / (np.power(total_batches * Te, 0.5))
 
@@ -66,7 +66,7 @@ mann = MANN(train_dataloader=train_dataloader,
             num_experts=num_experts,
             gn_hidden_size=gn_hidden_size,
             mpn_hidden_size=mpn_hidden_size,
-            dropout_probability = dropout_probability)
+            dropout_probability=dropout_probability)
 
 # Check the trainable parameters in the model
 for name, param in mann.named_parameters():
@@ -103,7 +103,7 @@ for epoch in range(epochs):
 
     print(f"Epoch {epoch + 1}\n-------------------------------")
     mann.train_loop(loss_fn, optimizer, epoch, writer)
-    mann.test_loop(loss_fn, epoch, writer)
+    mann.test_loop(loss_fn)
 
     # Save the trained model periodically and at the very last iteration
     if epoch % 10 == 0 or epoch == epochs - 1:
