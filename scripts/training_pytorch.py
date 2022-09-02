@@ -53,8 +53,8 @@ weightDecay_ini = 0.0025
 Te_cumulative = Te
 
 # Configure the datasets for training and testing
-train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-test_dataloader = DataLoader(testing_data, batch_size=batch_size, shuffle=True)
+train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=False)
+test_dataloader = DataLoader(testing_data, batch_size=batch_size, shuffle=False)
 
 # Normalize weight decay # TODO: check
 total_batches = int(len(train_dataloader))
