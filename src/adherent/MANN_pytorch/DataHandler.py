@@ -1,126 +1,123 @@
-import os
 import json
 import numpy as np
 from typing import List
 from datetime import datetime
 from torch.utils.data import Dataset
-from adherent.MANN_pytorch.utils import get_dataset_portions, create_path, normalize, store_in_file
+from adherent.MANN_pytorch.utils import create_path, normalize, store_in_file
 
 
 class CustomDataset(Dataset):
     """Class for a custom PyTorch Dataset."""
 
-    def __init__(self, X, Y):
+    def __init__(self, X: np.array, Y: np.array):
+        """Constructor of the custom dataset.
+
+        Args:
+            X (np.array): The vector of inputs
+            Y (np.array): The vector of outputs
+        """
+
         self.X = X
         self.Y = Y
 
-    def __len__(self):
-        return len(self.X)
+    def __len__(self) -> int:
+        """Getter of the dataset length.
 
-    def __getitem__(self, idx):
+        Returns:
+            dataset_length (np.array): The number of (X,Y) instances included in the dataset
+        """
+
+        dataset_length = len(self.X)
+        return dataset_length
+
+    def __getitem__(self, idx) -> (np.array, np.array):
+        """Getter of an element of the dataset.
+
+        Args:
+            idx (int): The index of the desired element in the dataset
+
+        Returns:
+            x_idx (np.array): The input vector at the specified index in the dataset
+            y_idx (np.array): The output vector at the specified index in the dataset
+        """
+
         x_idx = self.X[idx]
         y_idx = self.Y[idx]
         return x_idx, y_idx
 
-    def get_input_size(self):
-        return len(self.X[0])
+    def get_input_size(self) -> int:
+        """Getter of the input size.
 
-    def get_output_size(self):
-        return len(self.Y[0])
+        Returns:
+            input_size (int): The size of the input vectors in the dataset
+        """
+
+        input_size = len(self.X[0])
+        return input_size
+
+    def get_output_size(self) -> int:
+        """Getter of the output size.
+
+        Returns:
+            output_size (int): The size of the output vectors in the dataset
+        """
+
+        output_size = len(self.Y[0])
+        return output_size
 
 
 class DataHandler:
     """Class for processing the data in order to get the training and testing sets."""
 
-    def __init__(self, datasets: List, mirroring: bool, training_set_percentage: int):
+    def __init__(self, input_paths: List, output_paths: List, storage_folder: str, training_set_percentage: int):
+        """DataHandler constructor.
 
-        # Define the paths to the inputs and outputs of the network
-        self.input_paths, self.output_paths = self.define_input_and_output_paths(datasets, mirroring)
+        Args:
+            input_paths (List): The list of filenames containing all the inputs to be stacked
+            output_paths (List): The list of filenames containing all the outputs to be stacked
+            storage_folder (str): The initial name of the local folder to be used for storage
+            training_set_percentage (int): The percentage of the data to be used for training
+        """
 
-        # Define and create the path to store the training-related data
-        self.savepath = self.define_savepath(datasets, mirroring)
-        create_path([self.savepath])
+        # Store the paths to the inputs and outputs of the network
+        self.input_paths = input_paths
+        self.output_paths = output_paths
 
-        # Define the training and testing data
-        self.training_data, self.testing_data = self.define_training_and_testing_data(training_set_percentage)
+        # Store the path for the training-related data
+        self.savepath = self.define_savepath(storage_folder)
 
-    @staticmethod
-    def define_input_and_output_paths(datasets: List, mirroring: bool) -> (List, List):
-        """Given the datasets and the mirroring flag, retrieve the list of input and output filenames."""
-
-        script_directory = os.path.dirname(os.path.abspath(__file__))
-
-        # Initialize input filenames list
-        input_paths = []
-
-        # Fill input filenames list
-        for dataset in datasets:
-
-            inputs = get_dataset_portions(dataset)
-
-            for index in inputs.keys():
-                input_path = script_directory + "/../../../datasets/IO_features/inputs_subsampled_" + dataset + "/" + inputs[index] + "_X.txt"
-                input_paths.append(input_path)
-
-                if mirroring:
-                    input_path = script_directory + "/../../../datasets/IO_features/inputs_subsampled_mirrored_" + dataset + "/" + inputs[index] + "_X_MIRRORED.txt"
-                    input_paths.append(input_path)
-
-        # Debug
-        print("\nInput files:")
-        for input_path in input_paths:
-            print(input_path)
-
-        # Initialize output filenames list
-        output_paths = []
-
-        # Fill output filenames list
-        for dataset in datasets:
-
-            outputs = get_dataset_portions(dataset)
-
-            for index in outputs.keys():
-                output_path = script_directory + "/../../../datasets/IO_features/outputs_subsampled_" + dataset + "/" + outputs[index] + "_Y.txt"
-                output_paths.append(output_path)
-
-                if mirroring:
-                    output_path = script_directory + "/../../../datasets/IO_features/outputs_subsampled_mirrored_" + dataset + "/" + outputs[index] + "_Y_MIRRORED.txt"
-                    output_paths.append(output_path)
-
-        # Debug
-        print("\nOutput files:")
-        for output_path in output_paths:
-            print(output_path)
-
-        return input_paths, output_paths
+        # Retrieve the training and testing data
+        self.training_data, self.testing_data = self.retrieve_training_and_testing_data(training_set_percentage)
 
     @staticmethod
-    def define_savepath(datasets: List, mirroring: bool) -> str:
-        """Given the datasets and the mirroring flag, retrieve the storage path."""
+    def define_savepath(storage_folder: str) -> str:
+        """Update the storage folder name by adding the current timing so to have different savepaths for each training.
 
-        script_directory = os.path.dirname(os.path.abspath(__file__))
+        Args:
+            storage_folder (str): The initial name of the local folder to be used for storage
 
-        # Set storage folder
-        if not mirroring:
-            savepath = script_directory + '/../../../datasets/training_subsampled'
-        else:
-            savepath = script_directory + '/../../../datasets/training_subsampled_mirrored'
-        for dataset in datasets:
-            savepath += "_" + dataset
+        Returns:
+            savepath (str): The updated name of the local folder to be used for storage, including the current timing
+        """
 
         now = datetime.now().strftime("%Y%m%d-%H%M%S")
-        savepath += "_" + now
-
-        # Debug
-        print("\nSavepath:", savepath, "\n")
+        savepath = storage_folder + "_" + now
 
         return savepath
 
-    def define_training_and_testing_data(self, training_set_percentage: int) -> (CustomDataset, CustomDataset):
-        """Given the training percentage, retrieve the training and testing datasets."""
+    def retrieve_training_and_testing_data(self, training_set_percentage: int) -> (CustomDataset, CustomDataset):
+        """Given the training percentage, retrieve the training and testing datasets.
+
+        Args:
+            training_set_percentage (int): The percentage of the data to be used for training
+
+        Returns:
+            training_data (CustomDataset): The training dataset
+            testing_data (CustomDataset): The testing dataset
+        """
 
         # Create the path for the I/O-related storage
-        create_path([self.savepath + '/normalization'])
+        create_path(self.savepath + '/normalization')
 
         # ===================
         # RETRIEVE INPUT DATA
@@ -153,7 +150,7 @@ class DataHandler:
         # Debug
         print("X train size:", len(X_train), "x", len(X_train[0]))
 
-        # Store input statistics
+        # Store input statistics (useful at inference time)
         store_in_file(Xmean.tolist(), self.savepath + "/normalization/X_mean.txt")
         store_in_file(Xstd.tolist(), self.savepath + "/normalization/X_std.txt")
 
@@ -187,7 +184,7 @@ class DataHandler:
         # Debug
         print("Y train size:", len(Y_train), "x", len(Y_train[0]))
 
-        # Store output statistics
+        # Store output statistics (useful at inference time)
         store_in_file(Ymean.tolist(), self.savepath + "/normalization/Y_mean.txt")
         store_in_file(Ystd.tolist(), self.savepath + "/normalization/Y_std.txt")
 
@@ -200,18 +197,30 @@ class DataHandler:
 
         return training_data, testing_data
 
-    def get_savepath(self):
-        """Getter of the savepath."""
+    def get_savepath(self) -> str:
+        """Getter of the savepath.
+
+        Returns:
+            self.savepath (str): The path used for storage
+        """
 
         return self.savepath
 
     def get_training_data(self):
-        """Getter of the training dataset."""
+        """Getter of the training dataset.
+
+        Returns:
+            self.training_data (CustomDataset): The training dataset
+        """
 
         return self.training_data
 
     def get_testing_data(self):
-        """Getter of the testing dataset."""
+        """Getter of the testing dataset.
+
+        Returns:
+            self.testing_data (CustomDataset): The testing dataset
+        """
 
         return self.testing_data
 

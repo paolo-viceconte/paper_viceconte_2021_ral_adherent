@@ -1,51 +1,49 @@
+import os
 import torch
-import argparse
 import numpy as np
 from torch import nn
 from torch.utils.data import DataLoader
 from adherent.MANN_pytorch.MANN import MANN
 from torch.utils.tensorboard import SummaryWriter
-from adherent.MANN_pytorch.DataHandler import DataHandler
 from adherent.MANN_pytorch.utils import create_path
-
-# ==================
-# USER CONFIGURATION
-# ==================
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--deactivate_mirroring", help="Discard features from mirrored mocap data.", action="store_true")
-args = parser.parse_args()
-mirroring = not args.deactivate_mirroring
+from adherent.MANN_pytorch.DataHandler import DataHandler
 
 # =====================
 # DATASET CONFIGURATION
 # =====================
 
-# Define the datasets to be used
-datasets = ["D2", "D3"]
+# Local input, output and storage paths
+input_paths = ["input_1.txt"]
+output_paths = ["output_1.txt"]
+storage_folder = "storage"
+
+# Global input, output and storage paths
+script_directory = os.path.dirname(os.path.abspath(__file__))
+for i in range(len(input_paths)):
+    input_paths[i] = script_directory + "/" + input_paths[i]
+for i in range(len(output_paths)):
+    output_paths[i] = script_directory + "/" + output_paths[i]
+storage_folder = script_directory + "/" + storage_folder
 
 # Retrieve the training and testing datasets
-data_handler = DataHandler(datasets=datasets, mirroring=mirroring, training_set_percentage=98)
+data_handler = DataHandler(input_paths=input_paths, output_paths=output_paths, storage_folder=storage_folder, training_set_percentage=98)
 training_data = data_handler.get_training_data()
 testing_data = data_handler.get_testing_data()
 
-# ========
-# TRAINING
-# ========
-
-# Debug
-input("\nPress Enter to start the training")
+# ======================
+# TRAINING CONFIGURATION
+# ======================
 
 # Random seed
 torch.manual_seed(23456)
 
-# Define training hyperparameters
+# Training hyperparameters
 num_experts = 4
 batch_size = 32
 dropout_probability = 0.3
 gn_hidden_size = 32
 mpn_hidden_size = 512
-epochs = 150
+epochs = 10
 Te = 10
 Tmult = 2
 learning_rate_ini = 0.0001
@@ -90,18 +88,24 @@ wd_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_wd_optimizer, T_m
 
 # Configure tensorboard writer
 writer_path = data_handler.get_savepath() + "/logs/"
-create_path([writer_path])
+create_path(writer_path)
 writer = SummaryWriter(log_dir=writer_path)
 
 # Create the path to periodically store the learned models
 model_path = data_handler.get_savepath() + "/models/"
-create_path([model_path])
+create_path(model_path)
 last_model_path = ""
 
-# Training loop
+# =============
+# TRAINING LOOP
+# =============
+
 for epoch in range(epochs):
 
+    # Debug
     print(f"Epoch {epoch + 1}\n-------------------------------")
+
+    # Perform one epoch of training and testing
     mann.train_loop(loss_fn, optimizer, epoch, writer)
     mann.test_loop(loss_fn)
 
@@ -126,6 +130,8 @@ for epoch in range(epochs):
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_lr_optimizer, T_max=Te)
         wd_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(fake_wd_optimizer, T_max=Te)
 
+# Close tensorboard writer
 writer.close()
 
+# Debug
 print("Training over!")

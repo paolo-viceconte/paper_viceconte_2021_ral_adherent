@@ -6,8 +6,16 @@ from torch import nn
 class MotionPredictionNetwork(nn.Module):
     """Class for the Motion Prediction Network included in the MANN architecture."""
 
-    def __init__(self, num_experts, input_size, output_size, hidden_size, dropout_probability):
-        """Motion Prediction Network constructor."""
+    def __init__(self, num_experts: int, input_size: int, output_size: int, hidden_size: int, dropout_probability: float):
+        """Motion Prediction Network constructor.
+
+        Args:
+            num_experts (int): The number of expert weights constituting the network
+            input_size (int): The dimension of the input vector for the network
+            output_size (int): The dimension of the output vector for the network
+            hidden_size (int): The dimension of the 3 hidden layers of the network
+            dropout_probability (float): The probability of an element to be zeroed in the network training
+        """
 
         # Superclass constructor
         super(MotionPredictionNetwork, self).__init__()
@@ -43,8 +51,16 @@ class MotionPredictionNetwork(nn.Module):
         self.elu = nn.ELU()
         self.dropout = nn.Dropout(p=dropout_probability)
 
-    def forward(self, x, blending_coefficients):
-        """Motion Prediction Network 3-layers architecture."""
+    def forward(self, x: torch.Tensor, blending_coefficients: torch.Tensor) -> torch.Tensor:
+        """Motion Prediction Network 3-layers architecture.
+
+        Args:
+            x (torch.Tensor): The input vector for the network
+            blending_coefficients (torch.Tensor): The coefficients, outputed by the Gating Network, used to blend the expert weights
+
+        Returns:
+            y (torch.Tensor): The vector outputed by the network
+        """
 
         # Input processing
         x = torch.unsqueeze(x, -1)
@@ -68,15 +84,24 @@ class MotionPredictionNetwork(nn.Module):
         blended_w2 = torch.einsum("ij,ikl->jkl", blending_coefficients, self.w2)
         blended_b2 = torch.einsum("ij,ikl->jkl", blending_coefficients, self.b2)
         H2 = torch.matmul(blended_w2, H1) + blended_b2
-        H2 = torch.squeeze(H2, -1)
+        y = torch.squeeze(H2, -1)
 
-        return H2
+        return y
 
     @staticmethod
-    def initialize_mpn_weights(w):
+    def initialize_mpn_weights(w: torch.Tensor) -> torch.Tensor:
         """Initialize the Motion Prediction Network weights using uniform distribution
-        with bounds defined on the basis of the dimensions of the network layers."""
+        with bounds defined on the basis of the dimensions of the network layers.
+
+        Args:
+            w (torch.Tensor): The empty network layer weights, to be initialized
+
+        Returns:
+            w_init (torch.Tensor): The initialized network layer weights
+        """
 
         bound = np.sqrt(6. / np.prod(w.shape[-2:]))
-        return w.uniform_(-bound, bound)
+        w_init = w.uniform_(-bound, bound)
+
+        return w_init
 

@@ -6,8 +6,15 @@ from torch import nn
 class GatingNetwork(nn.Module):
     """Class for the Gating Network included in the MANN architecture."""
 
-    def __init__(self, input_size, output_size, hidden_size, dropout_probability):
-        """Gating Network constructor."""
+    def __init__(self, input_size: int, output_size: int, hidden_size: int, dropout_probability: float):
+        """Gating Network constructor.
+
+        Args:
+            input_size (int): The dimension of the input vector for the network
+            output_size (int): The dimension of the output vector for the network
+            hidden_size (int): The dimension of the 3 hidden layers of the network
+            dropout_probability (float): The probability of an element to be zeroed in the network training
+        """
 
         # Superclass constructor
         super(GatingNetwork, self).__init__()
@@ -43,8 +50,15 @@ class GatingNetwork(nn.Module):
         self.dropout = nn.Dropout(p=dropout_probability)
         self.softmax = nn.Softmax(dim=0)
 
-    def forward(self, x):
-        """Gating Network 3-layers architecture."""
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Gating Network 3-layers architecture.
+
+        Args:
+            x (torch.Tensor): The input vector for the network
+
+        Returns:
+            y (torch.Tensor): The normalized blending coefficients representing the output of the network
+        """
 
         # Input processing
         x = self.dropout(x)
@@ -63,14 +77,23 @@ class GatingNetwork(nn.Module):
         H2 = torch.matmul(self.w2, H1) + self.b2
 
         # Softmax to output normalized blending coefficients
-        H2 = self.softmax(H2)
+        y = self.softmax(H2)
 
-        return H2
+        return y
 
     @staticmethod
-    def initialize_gn_weights(w):
+    def initialize_gn_weights(w: torch.Tensor) -> torch.Tensor:
         """Initialize the Gating Network weights using uniform distribution with
-        bounds defined on the basis of the dimensions of the network layers."""
+        bounds defined on the basis of the dimensions of the network layers.
+
+        Args:
+            w (torch.Tensor): The empty network layer weights, to be initialized
+
+        Returns:
+            w_init (torch.Tensor): The initialized network layer weights
+        """
 
         bound = np.sqrt(6. / np.sum(w.shape[-2:]))
-        return w.uniform_(-bound, bound)
+        w_init = w.uniform_(-bound, bound)
+
+        return w_init

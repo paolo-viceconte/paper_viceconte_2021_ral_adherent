@@ -3,33 +3,18 @@ import glob
 import json
 import os.path
 import numpy as np
-from typing import List, Dict
-
-def get_dataset_portions(dataset: str) -> Dict:
-    """Retrieve the portions associated to each dataset."""
-
-    if dataset == "D2":
-        portions = {1: "1_forward_normal_step",
-                    2: "2_backward_normal_step",
-                    3: "3_left_and_right_normal_step",
-                    4: "4_diagonal_normal_step",
-                    5: "5_mixed_normal_step"}
-    elif dataset == "D3":
-        portions = {6: "6_forward_small_step",
-                    7: "7_backward_small_step",
-                    8: "8_left_and_right_small_step",
-                    9: "9_diagonal_small_step",
-                    10: "10_mixed_small_step",
-                    11: "11_mixed_normal_and_small_step"}
-
-    else:
-        raise Exception("Dataset portions only defined for datasets D2 and D3.")
-
-    return portions
+from typing import List
 
 
 def get_latest_model_path(models_path: str) -> str:
-    """Retrieve the path of the latest saved model."""
+    """Retrieve the path of the latest saved model.
+
+    Args:
+        models_path (str): The folder in which the learned models are stored
+
+    Returns:
+        latest_model (str): The path of the latest saved model
+    """
 
     list_of_files = glob.glob(models_path + '*')
     latest_model = max(list_of_files, key=os.path.getctime)
@@ -38,16 +23,27 @@ def get_latest_model_path(models_path: str) -> str:
     return latest_model
 
 
-def create_path(path: List) -> None:
-    """Create a path if it does not exist."""
+def create_path(path: str) -> None:
+    """Create a path if it does not exist.
 
-    for subpath in path:
-        if not os.path.exists(subpath):
-            os.makedirs(subpath)
+    Args:
+        path (str): The path to be created
+    """
+
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 def normalize(X: np.array, axis: int) -> np.array:
-    """Normalize X along the given axis."""
+    """Normalize a matrix along the given axis.
+
+    Args:
+        X (np.array): The matrix to be normalized
+        axis (int): The axis along which the matrix has to be normalized
+
+    Returns:
+        X_norm (np.array): The normalized matrix
+    """
 
     # Compute mean and std
     Xmean = X.mean(axis=axis)
@@ -59,32 +55,53 @@ def normalize(X: np.array, axis: int) -> np.array:
             Xstd[elem] = 1
 
     # Normalize
-    X = (X - Xmean) / Xstd
+    X_norm = (X - Xmean) / Xstd
 
-    return X
+    return X_norm
 
 
 def denormalize(X: np.array, Xmean: np.array, Xstd: np.array) -> np.array:
-    """Denormalize X, given its mean and std."""
+    """Denormalize a matrix, given its mean and std.
+
+    Args:
+        X (np.array): The matrix to be denormalized
+        Xmean (np.array): The vector of means to be used for normalization
+        Xstd (np.array): The vector of standard deviations to be used for normalization
+
+    Returns:
+        X_denorm (np.array): The denormalized matrix
+    """
 
     # Denormalize
-    X = X * Xstd + Xmean
+    X_denorm = X * Xstd + Xmean
 
-    return X
+    return X_denorm
 
 
 def store_in_file(data: list, filename: str) -> None:
-    """Store data in file as json."""
+    """Store data in file as json.
+
+    Args:
+        data (list): The data to be stored
+        filename (str): The storage filename
+   """
 
     with open(filename, 'w') as outfile:
         json.dump(data, outfile)
 
 
 def read_from_file(filename: str) -> np.array:
-    """Read data as json from file."""
+    """Read data as json from file.
+
+    Args:
+        filename (str): The name of the file containing the data to be retrieved
+
+    Returns:
+        data (np.array): The retrieved data
+   """
 
     with open(filename, 'r') as openfile:
-        data = json.load(openfile)
+        data = np.array(json.load(openfile))
 
-    return np.array(data)
+    return data
 
