@@ -3,7 +3,7 @@ import numpy as np
 from typing import List
 from datetime import datetime
 from torch.utils.data import Dataset
-from MANN_pytorch.utils import create_path, normalize, store_in_file
+from mann_pytorch.utils import create_path, normalize, store_in_file
 
 
 class CustomDataset(Dataset):
