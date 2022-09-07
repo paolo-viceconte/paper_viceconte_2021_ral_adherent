@@ -2,30 +2,33 @@ import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from adherent.MANN_pytorch.DataHandler import DataHandler
+from MANN_pytorch.DataHandler import DataHandler
 
 # =============
 # CONFIGURATION
 # =============
 
-# Path to the learned model
-script_directory = os.path.dirname(os.path.abspath(__file__))
-last_model_path = script_directory + "/storage_20220906-155556/models/model_9.pth"
+# Learned model to be used in the MANN_pytorch/models folder
+model_path = "storage_20220907-085047/models/model_9.pth"
 
-# Local input, output and storage paths
+# Inputs to be considered in the MANN_pytorch/datasets/inputs folder
 input_paths = ["input_1.txt"]
-output_paths = ["output_1.txt"]
-storage_folder = "storage"
 
-# Global input, output and storage paths
+# Outputs to be considered in the MANN_pytorch/datasets/outputs folder
+output_paths = ["output_1.txt"]
+
+# Retrieve global model, input, output and storage paths
+script_directory = os.path.dirname(os.path.abspath(__file__))
+model_path = script_directory + "/../models/" + model_path
 for i in range(len(input_paths)):
-    input_paths[i] = script_directory + "/" + input_paths[i]
+    input_paths[i] = script_directory + "/../datasets/inputs/" + input_paths[i]
 for i in range(len(output_paths)):
-    output_paths[i] = script_directory + "/" + output_paths[i]
-storage_folder = script_directory + "/" + storage_folder
+    output_paths[i] = script_directory + "/../datasets/outputs/" + output_paths[i]
+storage_folder = script_directory + "/../models/storage"
 
 # Retrieve the testing dataset, iterable on batches of one single element
-data_handler = DataHandler(input_paths=input_paths, output_paths=output_paths, storage_folder=storage_folder, training_set_percentage=98)
+data_handler = DataHandler(input_paths=input_paths, output_paths=output_paths, storage_folder=storage_folder,
+                           training=False, training_set_percentage=98)
 testing_data = data_handler.get_testing_data()
 batch_size = 1
 test_dataloader = DataLoader(testing_data, batch_size=batch_size, shuffle=False)
@@ -38,7 +41,7 @@ loss_fn = nn.MSELoss(reduction="mean")
 # ===============
 
 # Restore the model with the trained weights
-mann_restored = torch.load(last_model_path)
+mann_restored = torch.load(model_path)
 
 # Set dropout and batch normalization layers to evaluation mode before running inference
 mann_restored.eval()
@@ -47,7 +50,9 @@ mann_restored.eval()
 # TESTING LOOP
 # ============
 
-# Perform one testing
+# Perform one testing loop
+print("\n################################### TESTING LOOP ##################################")
+input("Press ENTER to start testing loop")
 mann_restored.test_loop(loss_fn)
 
 # ==============
@@ -55,6 +60,8 @@ mann_restored.test_loop(loss_fn)
 # ==============
 
 # Perform inference on each element of the test set
+print("\n#################################### INFERENCE ####################################")
+input("Press ENTER to start element-wise inference")
 for X, y in test_dataloader:
 
     # Inference
@@ -62,7 +69,7 @@ for X, y in test_dataloader:
 
     # Debug
     print()
-    print("##################################################################################")
+    print("################################### NEW ELEMENT ###################################")
     print("INPUT:")
     print(X)
     print("GROUND TRUTH:")

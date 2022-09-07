@@ -2,31 +2,33 @@ import os
 import torch
 import numpy as np
 from torch import nn
+from MANN_pytorch.MANN import MANN
 from torch.utils.data import DataLoader
-from adherent.MANN_pytorch.MANN import MANN
+from MANN_pytorch.utils import create_path
+from MANN_pytorch.DataHandler import DataHandler
 from torch.utils.tensorboard import SummaryWriter
-from adherent.MANN_pytorch.utils import create_path
-from adherent.MANN_pytorch.DataHandler import DataHandler
 
 # =====================
 # DATASET CONFIGURATION
 # =====================
 
-# Local input, output and storage paths
+# Inputs to be considered in the MANN_pytorch/datasets/inputs folder
 input_paths = ["input_1.txt"]
-output_paths = ["output_1.txt"]
-storage_folder = "storage"
 
-# Global input, output and storage paths
+# Outputs to be considered in the MANN_pytorch/datasets/outputs folder
+output_paths = ["output_1.txt"]
+
+# Retrieve global input, output and storage paths
 script_directory = os.path.dirname(os.path.abspath(__file__))
 for i in range(len(input_paths)):
-    input_paths[i] = script_directory + "/" + input_paths[i]
+    input_paths[i] = script_directory + "/../datasets/inputs/" + input_paths[i]
 for i in range(len(output_paths)):
-    output_paths[i] = script_directory + "/" + output_paths[i]
-storage_folder = script_directory + "/" + storage_folder
+    output_paths[i] = script_directory + "/../datasets/outputs/" + output_paths[i]
+storage_folder = script_directory + "/../models/storage"
 
 # Retrieve the training and testing datasets
-data_handler = DataHandler(input_paths=input_paths, output_paths=output_paths, storage_folder=storage_folder, training_set_percentage=98)
+data_handler = DataHandler(input_paths=input_paths, output_paths=output_paths, storage_folder=storage_folder,
+                           training=True, training_set_percentage=98)
 training_data = data_handler.get_training_data()
 testing_data = data_handler.get_testing_data()
 

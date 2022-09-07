@@ -3,7 +3,7 @@ import numpy as np
 from typing import List
 from datetime import datetime
 from torch.utils.data import Dataset
-from adherent.MANN_pytorch.utils import create_path, normalize, store_in_file
+from MANN_pytorch.utils import create_path, normalize, store_in_file
 
 
 class CustomDataset(Dataset):
@@ -69,13 +69,14 @@ class CustomDataset(Dataset):
 class DataHandler:
     """Class for processing the data in order to get the training and testing sets."""
 
-    def __init__(self, input_paths: List, output_paths: List, storage_folder: str, training_set_percentage: int):
+    def __init__(self, input_paths: List, output_paths: List, storage_folder: str, training: bool, training_set_percentage: int):
         """DataHandler constructor.
 
         Args:
             input_paths (List): The list of filenames containing all the inputs to be stacked
             output_paths (List): The list of filenames containing all the outputs to be stacked
             storage_folder (str): The initial name of the local folder to be used for storage
+            training (bool): Flag to indicate whether the DataHandler will be used also for training (True) or for testing only (False)
             training_set_percentage (int): The percentage of the data to be used for training
         """
 
@@ -87,7 +88,7 @@ class DataHandler:
         self.savepath = self.define_savepath(storage_folder)
 
         # Retrieve the training and testing data
-        self.training_data, self.testing_data = self.retrieve_training_and_testing_data(training_set_percentage)
+        self.training_data, self.testing_data = self.retrieve_training_and_testing_data(training, training_set_percentage)
 
     @staticmethod
     def define_savepath(storage_folder: str) -> str:
@@ -105,10 +106,11 @@ class DataHandler:
 
         return savepath
 
-    def retrieve_training_and_testing_data(self, training_set_percentage: int) -> (CustomDataset, CustomDataset):
+    def retrieve_training_and_testing_data(self, training: bool, training_set_percentage: int) -> (CustomDataset, CustomDataset):
         """Given the training percentage, retrieve the training and testing datasets.
 
         Args:
+            training (bool): Flag to indicate whether the DataHandler will be used also for training (True) or for testing only (False)
             training_set_percentage (int): The percentage of the data to be used for training
 
         Returns:
@@ -116,8 +118,9 @@ class DataHandler:
             testing_data (CustomDataset): The testing dataset
         """
 
-        # Create the path for the I/O-related storage
-        create_path(self.savepath + '/normalization')
+        # If training, create the path for the I/O-related storage
+        if training:
+            create_path(self.savepath + '/normalization')
 
         # ===================
         # RETRIEVE INPUT DATA
@@ -150,9 +153,10 @@ class DataHandler:
         # Debug
         print("X train size:", len(X_train), "x", len(X_train[0]))
 
-        # Store input statistics (useful at inference time)
-        store_in_file(Xmean.tolist(), self.savepath + "/normalization/X_mean.txt")
-        store_in_file(Xstd.tolist(), self.savepath + "/normalization/X_std.txt")
+        # If training, store input statistics (useful at inference time)
+        if training:
+            store_in_file(Xmean.tolist(), self.savepath + "/normalization/X_mean.txt")
+            store_in_file(Xstd.tolist(), self.savepath + "/normalization/X_std.txt")
 
         # ====================
         # RETRIEVE OUTPUT DATA
@@ -184,9 +188,10 @@ class DataHandler:
         # Debug
         print("Y train size:", len(Y_train), "x", len(Y_train[0]))
 
-        # Store output statistics (useful at inference time)
-        store_in_file(Ymean.tolist(), self.savepath + "/normalization/Y_mean.txt")
-        store_in_file(Ystd.tolist(), self.savepath + "/normalization/Y_std.txt")
+        # If training, store output statistics (useful at inference time)
+        if training:
+            store_in_file(Ymean.tolist(), self.savepath + "/normalization/Y_mean.txt")
+            store_in_file(Ystd.tolist(), self.savepath + "/normalization/Y_std.txt")
 
         # =====================
         # BUILD CUSTOM DATASETS
