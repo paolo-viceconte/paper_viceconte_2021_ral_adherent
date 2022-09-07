@@ -2,19 +2,19 @@ import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from MANN_pytorch.DataHandler import DataHandler
+from mann_pytorch.DataHandler import DataHandler
 
 # =============
 # CONFIGURATION
 # =============
 
-# Learned model to be used in the MANN_pytorch/models folder
-model_path = "storage_20220907-085047/models/model_9.pth"
+# Learned model to be used in the /models folder
+model_path = "storage_20220907-144108/models/model_9.pth"
 
-# Inputs to be considered in the MANN_pytorch/datasets/inputs folder
+# Inputs to be considered in the /datasets/inputs folder
 input_paths = ["input_1.txt"]
 
-# Outputs to be considered in the MANN_pytorch/datasets/outputs folder
+# Outputs to be considered in the /datasets/outputs folder
 output_paths = ["output_1.txt"]
 
 # Retrieve global model, input, output and storage paths

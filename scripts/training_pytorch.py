@@ -2,20 +2,20 @@ import os
 import torch
 import numpy as np
 from torch import nn
-from MANN_pytorch.MANN import MANN
+from mann_pytorch.MANN import MANN
 from torch.utils.data import DataLoader
-from MANN_pytorch.utils import create_path
-from MANN_pytorch.DataHandler import DataHandler
+from mann_pytorch.utils import create_path
+from mann_pytorch.DataHandler import DataHandler
 from torch.utils.tensorboard import SummaryWriter
 
 # =====================
 # DATASET CONFIGURATION
 # =====================
 
-# Inputs to be considered in the MANN_pytorch/datasets/inputs folder
+# Inputs to be considered in the /datasets/inputs folder
 input_paths = ["input_1.txt"]
 
-# Outputs to be considered in the MANN_pytorch/datasets/outputs folder
+# Outputs to be considered in the /datasets/outputs folder
 output_paths = ["output_1.txt"]
 
 # Retrieve global input, output and storage paths

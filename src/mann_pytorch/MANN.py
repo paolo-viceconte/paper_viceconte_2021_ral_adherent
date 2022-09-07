@@ -3,9 +3,9 @@ from torch import nn
 from torch.optim import Optimizer
 from torch.nn.modules.loss import _Loss
 from torch.utils.data.dataloader import DataLoader
-from MANN_pytorch.GatingNetwork import GatingNetwork
+from mann_pytorch.GatingNetwork import GatingNetwork
 from torch.utils.tensorboard.writer import SummaryWriter
-from MANN_pytorch.MotionPredictionNetwork import MotionPredictionNetwork
+from mann_pytorch.MotionPredictionNetwork import MotionPredictionNetwork
 
 
 class MANN(nn.Module):

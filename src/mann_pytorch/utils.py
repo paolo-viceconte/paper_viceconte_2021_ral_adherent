@@ -3,7 +3,6 @@ import glob
 import json
 import os.path
 import numpy as np
-from typing import List
 
 
 def get_latest_model_path(models_path: str) -> str:
