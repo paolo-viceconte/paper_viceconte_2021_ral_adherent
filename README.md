@@ -5,7 +5,7 @@
    <a href="https://github.com/ami-iit/bipedal-locomotion-framework/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-BSD_3--Clause-orange.svg" alt="Size" class="center"/></a>
 </p>
 
-The **mann-pytorch** project is a PyTorch implementation of the mode-adaptive neural networks (mann) architecture, originally proposed in H. Zhang, S. Starke, T. Komura, and J. Saito, “mMode-adaptive neural
+The **mann-pytorch** project is a PyTorch implementation of the Mode-Adaptive Neural Networks (MANN) architecture, originally proposed in H. Zhang, S. Starke, T. Komura, and J. Saito, “Mode-adaptive neural
 networks for quadruped motion control,” ACM Trans. Graph., vol. 37,
 no. 4, pp. 1–11, 2018.
 
@@ -38,7 +38,7 @@ pip install .
 
 ### Training
 
-Run the training script by:
+You can execute a sample training script by:
 
 ```bash
 cd mann-pytorch/scripts
@@ -54,7 +54,7 @@ python3 -m tensorboard.main --logdir=logs
 
 ### Testing
 
-Run the testing script by:
+You can execute a sample testing script by:
 
 ```bash
 cd mann-pytorch/scripts
