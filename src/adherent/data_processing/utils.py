@@ -92,6 +92,18 @@ def quaternion_multiply(quat1: List, quat2: List) -> np.array:
 
     return res
 
+
+def quaternion_inner_product(quat1: List, quat2: List) -> float:
+    """Auxiliary function for quaternion inner product."""
+
+    w1, x1, y1, z1 = quat1
+    w2, x2, y2, z2 = quat2
+
+    res = w1 * w2 + x1 * x2 + y1 * y2 + z1 * z2
+
+    return res
+
+
 def to_xyzw(wxyz: List) -> List:
     """Auxiliary function to convert quaternions from wxyz to xyzw format."""
 

@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia
 # SPDX-License-Identifier: BSD-3-Clause
 
+import math
 import numpy as np
 from typing import List, Dict
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from adherent.data_processing import motion_data
 from gym_ignition.rbd.idyntree import kindyncomputations
 from gym_ignition.rbd.idyntree.inverse_kinematics_nlp import IKSolution
 from gym_ignition.rbd.idyntree.inverse_kinematics_nlp import InverseKinematicsNLP
+import matplotlib.pyplot as plt
 
 
 @dataclass
@@ -232,6 +234,7 @@ class WBGR:
 
         timestamps = []
         ik_solutions = []
+        quat_distances = []
 
         # Initialize ik solution
         ik_solution = IKSolution(base_position=self.ik_targets.base_pose_targets['positions'][0],
@@ -244,6 +247,7 @@ class WBGR:
         jumped_frames = 0
 
         for i in range(len(self.ik_targets.timestamps)):
+        # for i in range(5000,10000):
 
             print(i, "/", len(self.ik_targets.timestamps))
 
@@ -256,9 +260,10 @@ class WBGR:
             # Base pose target
             target_base_position = self.ik_targets.base_pose_targets['positions'][i]
             target_base_quaternion = self.ik_targets.base_pose_targets['orientations'][i]
-            self.ik.update_transform_target(target_name="data_Pelvis",
-                                            position=target_base_position,
-                                            quaternion=target_base_quaternion)
+            rotated_base_quaternion = utils.quaternion_multiply(self.robot_to_target_base_quat, target_base_quaternion)
+            # self.ik.update_transform_target(target_name="data_Pelvis",
+            #                                 position=target_base_position,
+            #                                 quaternion=target_base_quaternion)
 
             # Link orientation targets
             for link, orientations in self.ik_targets.link_orientation_targets.items():
@@ -275,6 +280,12 @@ class WBGR:
             # ========
 
             try:
+
+                # Reinitialize the IK initial guess with the human base
+                reinitialized_ik_sol = IKSolution(base_position=target_base_position,
+                                                  base_quaternion=rotated_base_quaternion,
+                                                  joint_configuration=np.array(ik_solution.joint_configuration))
+                self.ik.warm_start_from(reinitialized_ik_sol)
 
                 self.ik.solve()
 
@@ -294,7 +305,25 @@ class WBGR:
                 continue
 
             ik_solution = self.ik.get_full_solution()
+
+            # TODO: override (?)
             ik_solutions.append(ik_solution)
+
+            quat_distance = 1 - math.pow(utils.quaternion_inner_product(list(rotated_base_quaternion), ik_solution.base_quaternion),2)
+            quat_distances.append(quat_distance)
+
+        plt.figure()
+        print(np.mean(quat_distances))
+        plt.plot(range(len(quat_distances)), quat_distances,)
+
+        # Plot configuration
+        plt.ylim([0, 1])
+        plt.ylabel("base orientation difference")
+        plt.xlabel("retargeting frames")
+
+        # Plot
+        plt.show()
+        plt.pause(1)
 
         print("Jumped", jumped_frames, "frames due to IK failures")
 

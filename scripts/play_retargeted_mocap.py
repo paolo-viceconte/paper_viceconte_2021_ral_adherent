@@ -106,3 +106,5 @@ gazebo.run(paused=True)
 input("Press Enter to start the visualization of the retargeted motion")
 utils.visualize_retargeted_motion(timestamps=timestamps, ik_solutions=ik_solutions, icub=icub,
                                   controlled_joints=controlled_joints, gazebo=gazebo)
+
+input("CLOSE")

@@ -113,7 +113,7 @@ ik.initialize(verbosity=1,
               floating_base=True)
 
 # Add base pose target as a constraint
-ik.add_target(frame_name="data_Pelvis", target_type=TargetType.POSE, as_constraint=True)
+# ik.add_target(frame_name="data_Pelvis", target_type=TargetType.POSE, as_constraint=True)
 
 # Add link orientation targets
 target_links = ['data_T8', 'data_Head', 'data_RightUpperLeg', 'data_RightLowerLeg', 'data_RightFoot',
@@ -179,3 +179,5 @@ if visualize_retargeted_motion:
     input("Press Enter to start the visualization of the retargeted motion")
     utils.visualize_retargeted_motion(timestamps=timestamps, ik_solutions=ik_solutions, icub=icub,
                                       controlled_joints=controlled_joints, gazebo=gazebo)
+
+input("Close")
