@@ -129,3 +129,27 @@ for epoch in range(epochs):
 writer.close()
 
 print("Training over!")
+
+# # TODO: temporary - to be removed
+# # =====================
+# # CHECK MODEL RESTORING
+# # =====================
+#
+# last_model_path = "/home/pviceconte/git/adherent_mann_reimplementation/datasets/training_subsampled_mirrored_D2_D3_20220824-162216/models/model_60.pth"
+#
+# # Restore the model with the trained weights
+# mann_restored = torch.load(last_model_path)
+#
+# # TODO: doublecheck the effect of this line
+# # TODO: is dropout set to zero?
+# # Set dropout and batch normalization layers to evaluation mode before running inference
+# mann_restored.eval()
+#
+# # Inference test
+# for X, y in test_dataloader:
+#     # Test on the first element of the batch
+#     print(X[:1,:].shape)
+#     pred = mann_restored.inference(X[:1,:])
+#     print(pred)
+#     print(y[:1,:])
+#     input("Press ENTER to continue inference")
