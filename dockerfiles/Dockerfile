@@ -1,7 +1,10 @@
-ARG from=ubuntu:focal
+ARG from=diegoferigo/cuda:10.2-cudnn8-runtime-ubuntu20.04
 FROM ${from}
 
 SHELL ["/bin/bash", "-i", "-c"]
+
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub 33
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub 8
 
 RUN apt-get update &&\
     apt-get install -y --no-install-recommends \
