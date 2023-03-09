@@ -53,8 +53,12 @@ def define_robot_to_target_base_quat(robot: str) -> List:
         # For iCubV3, the robot base frame is the same as the target base frame
         robot_to_target_base_quat = [0, 0, 0, 0.0]
 
+    elif robot == "ergoCubV1":
+        # For ergoCubV1, the robot base frame is the same as the target base frame
+        robot_to_target_base_quat = [0, 0, 0, 0.0]
+
     else:
-        raise Exception("Quaternions from the robot to the target base frame only defined for iCubV2_5 and iCubV3.")
+        raise Exception("Quaternions from the robot to the target base frame only defined for iCubV2_5, iCubV3 and ergoCubV1.")
 
     return robot_to_target_base_quat
 
@@ -73,8 +77,14 @@ def define_feet_frames_and_links(robot: str) -> Dict:
         right_foot_link = "r_ankle_2"
         left_foot_link = "l_ankle_2"
 
+    elif robot == "ergoCubV1":
+        right_foot_frame = "r_sole"
+        left_foot_frame = "l_sole"
+        right_foot_link = "r_ankle_2"
+        left_foot_link = "l_ankle_2"
+
     else:
-        raise Exception("Feet frames and links only defined for iCubV2_5 and iCubV3.")
+        raise Exception("Feet frames and links only defined for iCubV2_5, iCubV3 and ergoCubV1.")
 
     feet_frames = {"right_foot": right_foot_frame, "left_foot": left_foot_frame}
     feet_links = {feet_frames["right_foot"]: right_foot_link, feet_frames["left_foot"]: left_foot_link}
@@ -118,8 +128,25 @@ def define_foot_vertices(robot: str) -> List:
         BL_vertex_pos = [- box_size[0] - boxes_distance / 2, box_size[1] / 2, 0]
         BR_vertex_pos = [- box_size[0] - boxes_distance / 2, - box_size[1] / 2, 0]
 
+    elif robot == "ergoCubV1":
+
+        # For ergoCubV1, the feet vertices are symmetrically placed wrt the sole frame origin.
+        # The sole frame has z pointing up, x pointing forward and y pointing left.
+
+        # Size of the box which represents the foot rear
+        box_size = [0.117, 0.1, 0.006]
+
+        # Distance between the foot rear and the foot front boxes # TODO: doublecheck
+        boxes_distance = 0.00225
+
+        # Define front-left (FL), front-right (FR), back-left (BL) and back-right (BR) vertices in the foot frame
+        FL_vertex_pos = [box_size[0] + boxes_distance / 2, box_size[1] / 2, 0]
+        FR_vertex_pos = [box_size[0] + boxes_distance / 2, - box_size[1] / 2, 0]
+        BL_vertex_pos = [- box_size[0] - boxes_distance / 2, box_size[1] / 2, 0]
+        BR_vertex_pos = [- box_size[0] - boxes_distance / 2, - box_size[1] / 2, 0]
+
     else:
-        raise Exception("Feet vertices positions only defined for iCubV2_5 and iCubV3.")
+        raise Exception("Feet vertices positions only defined for iCubV2_5, iCubV3 and ergoCubV1.")
 
     # Vertices positions in the foot (F) frame
     F_vertices_pos = [FL_vertex_pos, FR_vertex_pos, BL_vertex_pos, BR_vertex_pos]

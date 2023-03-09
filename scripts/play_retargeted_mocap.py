@@ -87,7 +87,7 @@ scenario.set_verbosity(scenario.Verbosity_warning)
 gazebo, world = init_gazebo_sim()
 
 # Retrieve the robot urdf model
-icub_urdf = os.path.join(script_directory, "../src/adherent/model/iCubGazeboV3_xsens/iCubGazeboV3_xsens.urdf")
+icub_urdf = os.path.join(script_directory, "../src/adherent/model/ergoCubGazeboV1_xsens/ergoCubGazeboV1_xsens.urdf")
 
 # Insert the robot in the empty world
 icub = utils.iCub(world=world, urdf=icub_urdf)
