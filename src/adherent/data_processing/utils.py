@@ -221,8 +221,12 @@ def define_frontal_base_direction(robot: str) -> List:
         # For iCubV3, the x axis is pointing forward
         frontal_base_direction = [1, 0, 0]
 
+    elif robot == "ergoCubV1":
+        # For ergoCubV1, the x axis is pointing forward
+        frontal_base_direction = [1, 0, 0]
+
     else:
-        raise Exception("Frontal base direction only defined for iCubV2_5 and iCubV3.")
+        raise Exception("Frontal base direction only defined for iCubV2_5, iCubV3 and ergoCubV1.")
 
     return frontal_base_direction
 
@@ -237,8 +241,12 @@ def define_frontal_chest_direction(robot: str) -> List:
         # For iCubV3, the x axis of the chest frame is pointing forward
         frontal_chest_direction = [1, 0, 0]
 
+    elif robot == "ergoCubV1":
+        # For ergoCubV1, the x axis of the chest frame is pointing forward
+        frontal_chest_direction = [1, 0, 0]
+
     else:
-        raise Exception("Frontal chest direction only defined for iCubV2_5 and iCubV3.")
+        raise Exception("Frontal chest direction only defined for iCubV2_5, iCubV3 and ergoCubV1.")
 
     return frontal_chest_direction
 
