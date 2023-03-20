@@ -17,6 +17,7 @@ class GlobalFrameFeatures:
 
     # Features computation
     ik_solutions: List
+    controlled_joints_indexes: List
     dt_mean: float
     kindyn: kindyncomputations.KinDynComputations
     frontal_base_dir: List
@@ -34,6 +35,7 @@ class GlobalFrameFeatures:
 
     @staticmethod
     def build(ik_solutions: List,
+              controlled_joints_indexes: List,
               dt_mean: float,
               kindyn: kindyncomputations.KinDynComputations,
               frontal_base_dir: List,
@@ -41,6 +43,7 @@ class GlobalFrameFeatures:
         """Build an empty GlobalFrameFeatures."""
 
         return GlobalFrameFeatures(ik_solutions=ik_solutions,
+                                   controlled_joints_indexes=controlled_joints_indexes,
                                    dt_mean=dt_mean,
                                    kindyn=kindyn,
                                    frontal_base_dir=frontal_base_dir,
@@ -101,8 +104,8 @@ class GlobalFrameFeatures:
             facing_direction = facing_direction / np.linalg.norm(facing_direction) # of unitary norm
             self.facing_directions.append(facing_direction)
 
-            # Joint angles
-            joint_angles = joint_positions
+            # Joint angles (for the controlled joints only)
+            joint_angles = np.array([joint_positions[index] for index in self.controlled_joints_indexes])
             self.s.append(joint_angles)
 
             # Do not compute velocities by differentiation for the first frame
@@ -348,6 +351,7 @@ class FeaturesExtractor:
     @staticmethod
     def build(ik_solutions: List,
               kindyn: kindyncomputations.KinDynComputations,
+              controlled_joints_indexes: List,
               frontal_base_dir: List,
               frontal_chest_dir: List,
               dt_mean: float = 1/50,
@@ -366,6 +370,7 @@ class FeaturesExtractor:
 
         # Instantiate all the features
         gff = GlobalFrameFeatures.build(ik_solutions=ik_solutions,
+                                        controlled_joints_indexes=controlled_joints_indexes,
                                         dt_mean=dt_mean,
                                         kindyn=kindyn,
                                         frontal_base_dir=frontal_base_dir,

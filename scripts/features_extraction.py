@@ -91,15 +91,25 @@ icub_urdf = os.path.join(script_directory, "../src/adherent/model/ergoCubGazeboV
 # Insert the robot in the empty world
 icub = utils.iCub(world=world, urdf=icub_urdf)
 
-# Get the controlled joints
-controlled_joints = icub.joint_names()
+# Get the robot joints
+icub_joints = icub.joint_names()
+
+# Define the joints of interest for the features computation and their associated indexes in the robot joints  list
+controlled_joints = ['l_hip_pitch', 'l_hip_roll', 'l_hip_yaw', 'l_knee', 'l_ankle_pitch', 'l_ankle_roll',  # left leg
+                     'r_hip_pitch', 'r_hip_roll', 'r_hip_yaw', 'r_knee', 'r_ankle_pitch', 'r_ankle_roll',  # right leg
+                     'torso_pitch', 'torso_roll', 'torso_yaw',  # torso
+                     'neck_pitch', 'neck_roll', 'neck_yaw', # neck
+                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', 'l_wrist_yaw', 'l_wrist_roll', 'l_wrist_pitch', # left arm
+                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow', 'r_wrist_yaw', 'r_wrist_roll', 'r_wrist_pitch'] # right arm
+controlled_joints_indexes = [icub_joints.index(elem) for elem in controlled_joints]
+# controlled_joints_retrieved = [icub_joints[index] for index in controlled_joints_indexes] # This is how to use the indexes
 
 # Show the GUI
 gazebo.gui()
 gazebo.run(paused=True)
 
 # Create a KinDynComputations object
-kindyn = kindyncomputations.KinDynComputations(model_file=icub_urdf, considered_joints=controlled_joints)
+kindyn = kindyncomputations.KinDynComputations(model_file=icub_urdf, considered_joints=icub_joints)
 kindyn.set_robot_state_from_model(model=icub, world_gravity=np.array(world.gravity()))
 
 # ===================
@@ -113,6 +123,7 @@ frontal_chest_dir = utils.define_frontal_chest_direction(robot="ergoCubV1")
 # Instantiate the features extractor
 extractor = features_extractor.FeaturesExtractor.build(ik_solutions=ik_solutions,
                                                        kindyn=kindyn,
+                                                       controlled_joints_indexes=controlled_joints_indexes,
                                                        frontal_base_dir=frontal_base_dir,
                                                        frontal_chest_dir=frontal_chest_dir)
 # Extract the features
