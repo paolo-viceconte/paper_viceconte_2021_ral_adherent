@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia
 # SPDX-License-Identifier: BSD-3-Clause
 
-# Use tf version 2.3.0 as 1.x
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import torch
+from torch import nn
+from mann_pytorch.MANN import MANN
 
 import os
 import math
@@ -28,6 +28,7 @@ from adherent.trajectory_generation.utils import trajectory_blending
 from adherent.trajectory_generation.utils import load_output_mean_and_std
 from adherent.trajectory_generation.utils import compute_angle_wrt_x_positive_semiaxis
 from adherent.trajectory_generation.utils import load_component_wise_input_mean_and_std
+from mann_pytorch.utils import get_latest_model_path
 
 import matplotlib as mpl
 mpl.rcParams['toolbar'] = 'None'
@@ -697,6 +698,7 @@ class KinematicComputations:
     # Simulated robot (for visualization only)
     icub: iCub
     controlled_joints: List
+    controlled_joints_indexes: List
     gazebo: scenario.GazeboSimulator
 
     # Support foot and support vertex related quantities
@@ -713,6 +715,7 @@ class KinematicComputations:
 
     @staticmethod
     def build(kindyn: kindyncomputations.KinDynComputations,
+              controlled_joints_indexes: List,
               local_foot_vertices_pos: List,
               feet_frames: Dict,
               feet_links: Dict,
@@ -735,6 +738,7 @@ class KinematicComputations:
         postural_extractor = PosturalExtractor.build()
 
         return KinematicComputations(kindyn=kindyn,
+                                     controlled_joints_indexes=controlled_joints_indexes,
                                      footsteps_extractor=footsteps_extractor,
                                      postural_extractor=postural_extractor,
                                      local_foot_vertices_pos=local_foot_vertices_pos,
@@ -847,7 +851,10 @@ class KinematicComputations:
 
         # Reset joint configuration
         if joint_positions is not None:
-            self.icub.to_gazebo().reset_joint_positions(joint_positions, self.controlled_joints)
+            full_joint_positions = np.zeros(len(self.controlled_joints))
+            for i in range(len(joint_positions)):
+                full_joint_positions[self.controlled_joints_indexes[i]] = joint_positions[i]
+            self.icub.to_gazebo().reset_joint_positions(full_joint_positions, self.controlled_joints)
 
         # Reset base pose
         if base_position is not None and base_quaternion is not None:
@@ -1248,6 +1255,9 @@ class LearnedModel:
     # Path to the learned model
     model_path: str
 
+    # Learned model
+    learned_model: None
+
     # Output mean and standard deviation
     Ymean: List
     Ystd: List
@@ -1256,60 +1266,20 @@ class LearnedModel:
     def build(training_path: str) -> "LearnedModel":
         """Build an instance of LearnedModel."""
 
-        # Retrieve path to the learned model
-        model_path = os.path.join(training_path, "model/")
+        # Retrieve path to the latest saved model
+        model_path = get_latest_model_path(training_path+"models/")
+
+        # Restore the model with the trained weights
+        learned_model = torch.load(model_path)
+
+        # Set dropout and batch normalization layers to evaluation mode before running inference
+        learned_model.eval()
 
         # Compute output mean and standard deviation
         datapath = os.path.join(training_path, "normalization/")
         Ymean, Ystd = load_output_mean_and_std(datapath)
 
-        return LearnedModel(model_path=model_path, Ymean=Ymean, Ystd=Ystd)
-
-    def restore_learned_model(self, session: tf.Session) -> tf.Graph:
-        """Restore the learned model."""
-
-        # Restore the network generator
-        saver = tf.train.import_meta_graph(self.model_path + "/model.ckpt.meta")
-        saver.restore(session, tf.train.latest_checkpoint(self.model_path))
-
-        # Retrieve the graph
-        graph = tf.get_default_graph()
-
-        return graph
-
-    @staticmethod
-    def retrieve_tensors(graph: tf.Graph) -> (tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor):
-        """Retrieve the tensors associated to the quantities of interest."""
-
-        # Placeholder to feed the input X
-        nn_X = graph.get_tensor_by_name("nn_X:0")
-
-        # Placeholder to feed the dropout probability
-        nn_keep_prob = graph.get_tensor_by_name("nn_keep_prob:0")
-
-        # Tensor containing the network output
-        output = graph.get_tensor_by_name('Squeeze:0')
-
-        # Tensor containing the blending coefficients
-        blending_coefficients = graph.get_tensor_by_name('Softmax:0')
-
-        return nn_X, nn_keep_prob, output, blending_coefficients
-
-    @staticmethod
-    def evaluate_tensors(nn_X: tf.Tensor, current_nn_X: List, nn_keep_prob: tf.Tensor, output: tf.Tensor,
-                         blending_coefficients: tf.Tensor) -> (np.array, np.array):
-        """Evaluate the tensors associated to the quantities of interest."""
-
-        # Pass the input defined at the previous iteration to the network (no dropout at inference time)
-        feed_dict = {nn_X: current_nn_X, nn_keep_prob: 1.0}
-
-        # Extract the output from the network
-        current_output = output.eval(feed_dict=feed_dict)
-
-        # Extract the blending coefficients from the network
-        current_blending_coefficients = blending_coefficients.eval(feed_dict=feed_dict)
-
-        return current_output, current_blending_coefficients
+        return LearnedModel(model_path=model_path, learned_model=learned_model, Ymean=Ymean, Ystd=Ystd)
 
 
 @dataclass
@@ -1768,6 +1738,7 @@ class TrajectoryGenerator:
     def build(icub: iCub,
               gazebo: scenario.GazeboSimulator,
               kindyn: kindyncomputations.KinDynComputations,
+              controlled_joints_indexes: List,
               storage_path: str,
               training_path: str,
               local_foot_vertices_pos: List,
@@ -1802,6 +1773,7 @@ class TrajectoryGenerator:
 
         # Build the kinematic computations handler component
         kincomputations = KinematicComputations.build(kindyn=kindyn,
+                                                      controlled_joints_indexes=controlled_joints_indexes,
                                                       local_foot_vertices_pos=local_foot_vertices_pos,
                                                       feet_frames=feet_frames,
                                                       feet_links=feet_links,
@@ -1854,32 +1826,17 @@ class TrajectoryGenerator:
                                    model=model,
                                    generation_rate=generation_rate)
 
-    def restore_model_and_retrieve_tensors(self, session: tf.Session) -> (tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor):
-        """Restore the learned model and retrieve the tensors of interest."""
+    # TODO: retrieve and return also the blending coefficients
+    def retrieve_network_output_pytorch(self) -> (np.array, np.array):
+        """Retrieve the network output (also denormalized)."""
 
-        # Restore the learned model
-        graph = self.model.restore_learned_model(session=session)
-
-        # Retrieve the tensors of interest
-        nn_X, nn_keep_prob, output, blending_coefficients = self.model.retrieve_tensors(graph)
-
-        return nn_X, nn_keep_prob, output, blending_coefficients
-
-    def retrieve_network_output_and_blending_coefficients(self, nn_X: tf.Tensor, nn_keep_prob: tf.Tensor, output: tf.Tensor,
-                                                          blending_coefficients: tf.Tensor) -> (np.array, np.array, np.array):
-        """Retrieve the network output (also denormalized) and the blending coefficients."""
-
-        # Retrieve the network output and the blending coefficients
-        current_output, current_blending_coefficients = self.model.evaluate_tensors(nn_X=nn_X,
-                                                                                    current_nn_X=self.autoregression.current_nn_X,
-                                                                                    nn_keep_prob=nn_keep_prob,
-                                                                                    output=output,
-                                                                                    blending_coefficients=blending_coefficients)
+        # Retrieve the network output
+        current_output = self.model.learned_model.inference(torch.tensor(self.autoregression.current_nn_X)).numpy()
 
         # Denormalize the network output
         denormalized_current_output = denormalize(current_output, self.model.Ymean, self.model.Ystd)[0]
 
-        return current_output, denormalized_current_output, current_blending_coefficients
+        return current_output, denormalized_current_output
 
     def apply_joint_positions_and_base_orientation(self, denormalized_current_output: List, base_pitch_offset: float = 0) -> (List, List):
         """Apply joint positions and base orientation from the output returned by the network."""
@@ -2057,8 +2014,9 @@ class TrajectoryGenerator:
                                  plot_contacts: bool) -> None:
         """Update the blending coefficients, posturals and joystick input storages and periodically save data."""
 
-        # Update the blending coefficients storage
-        self.storage.update_blending_coefficients_storage(blending_coefficients=blending_coefficients)
+        # TODO: temporary fix to ignore the storage of the blending coefficients
+        # # Update the blending coefficients storage
+        # self.storage.update_blending_coefficients_storage(blending_coefficients=blending_coefficients)
 
         # Update the posturals storage
         self.storage.update_posturals_storage(base=base_postural, joints_pos=joints_pos_postural,
