@@ -907,6 +907,7 @@ def load_output_mean_and_std(datapath: str) -> (List, List):
 # ===================
 
 def visualize_generated_motion(icub: iCub,
+                               controlled_joints_indexes: List,
                                gazebo: scenario.GazeboSimulator,
                                posturals: Dict,
                                raw_data: List,
@@ -934,7 +935,7 @@ def visualize_generated_motion(icub: iCub,
         w_4 = blending_coeffs["w_4"]
 
     # Define controlled joints
-    controlled_joints = icub.joint_names()
+    icub_joints = icub.joint_names()
 
     # Plot configuration
     plt.ion()
@@ -954,7 +955,10 @@ def visualize_generated_motion(icub: iCub,
 
         # Retrieve the current joint positions
         joint_postural = joint_pos_posturals[frame_idx]
-        joint_positions = [joint_postural[joint] for joint in controlled_joints]
+
+        full_joint_positions = np.zeros(len(icub_joints))
+        for index in controlled_joints_indexes:
+            full_joint_positions[index] = joint_postural[icub_joints[index]]
 
         # Retrieve the current base position and orientation
         base_postural = base_posturals[frame_idx]
@@ -963,7 +967,7 @@ def visualize_generated_motion(icub: iCub,
 
         # Reset the robot configuration in the simulator
         icub.to_gazebo().reset_base_pose(base_position, base_quaternion)
-        icub.to_gazebo().reset_joint_positions(joint_positions, controlled_joints)
+        icub.to_gazebo().reset_joint_positions(full_joint_positions, icub_joints)
         gazebo.run(paused=True)
 
         # =====================================
