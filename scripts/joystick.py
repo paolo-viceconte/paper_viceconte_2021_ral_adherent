@@ -23,9 +23,6 @@ plot_bezier = not args.deactivate_bezier_plot
 # YARP CONFIGURATION
 # ==================
 
-# Inter-process communication is implemented via YARP ports, therefore "yarp server"
-# needs to be executed in a separate terminal before launching this script
-
 # Initialize YARP
 yarp.Network.init()
 

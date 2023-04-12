@@ -8,24 +8,14 @@ import os
 import yarp
 import time
 import argparse
-import numpy as np
+
+# TODO: remove (but protobuf error)
 import tensorflow.compat.v1 as tf
-from scenario import gazebo as scenario
-from adherent.data_processing.utils import iCub
+
 from gym_ignition.utils.scenario import init_gazebo_sim
 from gym_ignition.rbd.idyntree import kindyncomputations
-from adherent.data_processing.utils import define_foot_vertices
 from adherent.trajectory_generation import trajectory_generator
-from adherent.trajectory_generation.utils import define_initial_nn_X
-from adherent.data_processing.utils import define_feet_frames_and_links
-from adherent.trajectory_generation.utils import define_initial_base_yaw
-from adherent.data_processing.utils import define_frontal_base_direction
-from adherent.data_processing.utils import define_frontal_chest_direction
-from adherent.trajectory_generation.utils import define_base_pitch_offset
-from adherent.trajectory_generation.utils import define_initial_base_height
-from adherent.trajectory_generation.utils import define_initial_feet_positions
-from adherent.trajectory_generation.utils import define_initial_past_trajectory
-from adherent.trajectory_generation.utils import define_initial_support_foot_and_vertex
+from adherent.trajectory_generation.utils import *
 
 import matplotlib as mpl
 mpl.rcParams['toolbar'] = 'None'
@@ -37,39 +27,27 @@ import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--storage_path", help="Path where the generated trajectory will be stored. Relative path from script folder.",
-                    type=str, default="../datasets/inference/")
 parser.add_argument("--training_path", help="Path where the training-related data are stored. Relative path from script folder.",
                     type = str, default = "../datasets/training_subsampled_mirrored_D2_D3_20230320-190551/")
 parser.add_argument("--stream_every_N_steps", help="Data will be streamed every N steps.",
                     type=int, default=3)
 parser.add_argument("--stream_every_N_iterations", help="If no steps are performed, data will be streamed every N iterations.",
                     type=int, default=150) # TODO: tune
-parser.add_argument("--plot_trajectory_blending", help="Visualize the blending of the future ground trajectory to build the next network input.", action="store_true")
 parser.add_argument("--plot_footsteps", help="Visualize the footsteps.", action="store_true")
-parser.add_argument("--plot_blending_coefficients", help="Visualize blending coefficient activations.", action="store_true")
 parser.add_argument("--time_scaling", help="Time scaling to be applied to the generated trajectory. Keep it integer.",
                     type=int, default=1)
-parser.add_argument("--plot_contacts", help="Visualize the contacts extracted for the controller.", action="store_true")
 
 args = parser.parse_args()
 
-storage_path = args.storage_path
 training_path = args.training_path
 stream_every_N_iterations = args.stream_every_N_iterations
 stream_every_N_steps = args.stream_every_N_steps
-plot_trajectory_blending = args.plot_trajectory_blending
 plot_footsteps = args.plot_footsteps
-plot_blending_coefficients = args.plot_blending_coefficients
 time_scaling = args.time_scaling
-plot_contacts = args.plot_contacts
 
 # ==================
 # YARP CONFIGURATION
 # ==================
-
-# Inter-process communication is implemented via YARP ports, therefore "yarp server"
-# needs to be executed in a separate terminal before launching this script
 
 # Initialise YARP
 yarp.Network.init()
@@ -120,7 +98,6 @@ controlled_joints = ['l_hip_pitch', 'l_hip_roll', 'l_hip_yaw', 'l_knee', 'l_ankl
 controlled_joints_indexes = [icub_joints.index(elem) for elem in controlled_joints]
 # controlled_joints_retrieved = [icub_joints[index] for index in controlled_joints_indexes] # This is how to use the indexes
 
-
 # Create a KinDynComputations object
 kindyn = kindyncomputations.KinDynComputations(model_file=icub_urdf, considered_joints=controlled_joints)
 kindyn.set_robot_state_from_model(model=icub, world_gravity=np.array(world.gravity()))
@@ -129,11 +106,6 @@ kindyn.set_robot_state_from_model(model=icub, world_gravity=np.array(world.gravi
 # PLOT CONFIGURATION
 # ==================
 
-# Define the indexes of the figures for plotting
-figure_facing_dirs = 1
-figure_base_vel = 2
-figure_blending_coefficients = 3
-figure_footsteps = 4
 plt.ion()
 
 # ====================
@@ -176,7 +148,6 @@ base_pitch_offset = define_base_pitch_offset(robot="ergoCubV1")
 # Instantiate the trajectory generator
 generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gazebo, kindyn=kindyn,
                                                            controlled_joints_indexes=controlled_joints_indexes,
-                                                           storage_path=os.path.join(script_directory, storage_path),
                                                            training_path=os.path.join(script_directory, training_path),
                                                            local_foot_vertices_pos=local_foot_vertices_pos,
                                                            feet_frames=feet_frames,
@@ -203,6 +174,19 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
 
 while True:
 
+    # Initialize the mergepoint and plot initial footsteps
+    if generator.iteration == 1:
+
+        # Dummy mergepoint initialization
+        generator.autoregression.update_mergepoint_state()
+        generator.kincomputations.update_mergepoint_state()
+
+        # Plot the initial footsteps
+        if plot_footsteps:
+            for foot in generator.storage.footsteps:
+                generator.plotter.plot_new_footstep(support_foot=foot,
+                                                    new_footstep=generator.storage.footsteps[foot][-1])
+
     # Stream data every N steps (or if the maximum number of iterations without steps is reached)
     if generator.get_n_steps() == stream_every_N_steps or generator.get_n_iterations() == stream_every_N_iterations:
 
@@ -224,47 +208,10 @@ while True:
     # Retrieve the network output
     current_output, denormalized_current_output = generator.retrieve_network_output_pytorch()
 
-    # TODO: remove (this is related to the blending coefficients)
-    # # Retrieve the network output and the blending coefficients
-    # current_output, denormalized_current_output, current_blending_coefficients = \
-    #     generator.retrieve_network_output_and_blending_coefficients(nn_X=nn_X,
-    #                                                                 nn_keep_prob=nn_keep_prob,
-    #                                                                 output=output,
-    #                                                                 blending_coefficients=blending_coefficients)
-
     # Apply the joint positions and the base orientation from the network output
-    joint_positions, joint_velocities, new_base_quaternion = generator.apply_joint_positions_and_base_orientation(
-        denormalized_current_output=denormalized_current_output,
-        base_pitch_offset=base_pitch_offset)
-
-    # Handle first iteration differently
-    if generator.iteration > 1:
-
-        # Initialize the mergepoint TODO: why not working at the very first iteration?
-        if generator.iteration == 2:
-
-            # Dummy mergepoint initialization
-            generator.autoregression.update_mergepoint_state()
-            generator.kincomputations.update_mergepoint_state()
-
-            # Plot the initial footsteps
-            if plot_footsteps:
-                for foot in generator.storage.footsteps:
-                    generator.plotter.plot_new_footstep(figure_footsteps=figure_footsteps,
-                                                        support_foot=foot,
-                                                        new_footstep=generator.storage.footsteps[foot][-1])
-
-        # Update the support vertex position
-        generator.update_support_vertex_position()
-
-        # Compute kinematically-feasible base position and updated posturals
-        new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
-        new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural = \
-            generator.compute_kinematically_fasible_base_and_update_posturals(joint_positions=joint_positions,
-                                                                              joint_velocities=joint_velocities,
-                                                                              base_quaternion=new_base_quaternion,
-                                                                              controlled_joints=controlled_joints,
-                                                                              link_names=icub.link_names())
+    joint_positions, joint_velocities, new_base_quaternion = \
+        generator.apply_joint_positions_and_base_orientation(denormalized_current_output=denormalized_current_output,
+                                                             base_pitch_offset=base_pitch_offset)
 
     # Update the support foot and vertex while detecting new footsteps
     support_foot, update_footsteps_list = generator.update_support_vertex_and_support_foot_and_footsteps()
@@ -273,18 +220,16 @@ while True:
     if update_footsteps_list and plot_footsteps:
 
         # Plot the last footstep
-        generator.plotter.plot_new_footstep(figure_footsteps=figure_footsteps,
-                                            support_foot=support_foot,
+        generator.plotter.plot_new_footstep(support_foot=support_foot,
                                             new_footstep=generator.storage.footsteps[support_foot][-1])
 
     # Compute kinematically-feasible base position and updated posturals
-    new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
+    new_base_postural, new_joints_pos_postural, new_joints_vel_postural, \
     new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural = \
         generator.compute_kinematically_fasible_base_and_update_posturals(joint_positions=joint_positions,
                                                                           joint_velocities=joint_velocities,
                                                                           base_quaternion=new_base_quaternion,
-                                                                          controlled_joints=controlled_joints,
-                                                                          link_names=icub.link_names())
+                                                                          controlled_joints=controlled_joints)
 
     # Retrieve user input data from YARP port
     quad_bezier, base_velocities, facing_dirs, raw_data = \
@@ -302,51 +247,13 @@ while True:
                                               facing_dirs=facing_dirs,
                                               base_velocities=base_velocities)
 
-    # Update storage and periodically save data
-    generator.update_storages_and_save(blending_coefficients=[1,1,1,1], # TODO: remove (temporary fix to handle blending coefficients)
-                                       base_postural=new_base_postural,
-                                       joints_pos_postural=new_joints_pos_postural,
-                                       joint_vel_postural=new_joints_vel_postural,
-                                       links_postural=new_links_postural,
-                                       com_pos_postural=new_com_pos_postural,
-                                       com_vel_postural=new_com_vel_postural,
-                                       centroidal_momentum_postural=new_centroidal_momentum_postural,
-                                       raw_data=raw_data,
-                                       quad_bezier=quad_bezier,
-                                       base_velocities=base_velocities,
-                                       facing_dirs=facing_dirs,
-                                       stream_every_N_iterations=stream_every_N_iterations,
-                                       plot_contacts=plot_contacts)
-
-    # TODO: remove (temporary deactivation of the blending coefficients plots)
-    # if plot_trajectory_blending:
-    #
-    #     # Plot the trajectory blending
-    #     generator.plotter.plot_trajectory_blending(figure_facing_dirs=figure_facing_dirs,
-    #                                                figure_base_vel=figure_base_vel,
-    #                                                denormalized_current_output=denormalized_current_output,
-    #                                                quad_bezier=quad_bezier, facing_dirs=facing_dirs,
-    #                                                base_velocities=base_velocities,
-    #                                                blended_base_positions=blended_base_positions,
-    #                                                blended_facing_dirs=blended_facing_dirs,
-    #                                                blended_base_velocities=blended_base_velocities)
-    #
-    # if plot_blending_coefficients:
-    #
-    #     # Plot the blending coefficients
-    #     generator.plotter.plot_blending_coefficients(figure_blending_coefficients=figure_blending_coefficients,
-    #                                                  blending_coeffs=generator.storage.blending_coeffs)
-    #
-    # if plot_trajectory_blending or plot_footsteps or plot_blending_coefficients:
-    #
-    #     # Plot
-    #     plt.show()
-    #     plt.pause(0.0001)
-    #
-    # else:
-    #
-    #     # Slow down visualization
-    #     time.sleep(0.0001)
+    # Update postural storage
+    generator.update_storages(base_postural=new_base_postural,
+                              joints_pos_postural=new_joints_pos_postural,
+                              joint_vel_postural=new_joints_vel_postural,
+                              com_pos_postural=new_com_pos_postural,
+                              com_vel_postural=new_com_vel_postural,
+                              centroidal_momentum_postural=new_centroidal_momentum_postural)
 
     # Slow down visualization
     time.sleep(0.001)

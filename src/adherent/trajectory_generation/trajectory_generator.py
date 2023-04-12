@@ -1,35 +1,19 @@
 # SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia
 # SPDX-License-Identifier: BSD-3-Clause
 
-import torch
-from torch import nn
-from mann_pytorch.MANN import MANN
-
 import os
-import math
-import json
 import yarp
+import torch
 import random
-import numpy as np
-import manifpy as manif
-from typing import List, Dict
-from scenario import gazebo as scenario
-from dataclasses import dataclass, field
+from dataclasses import field
 from gym_ignition.rbd.idyntree import numpy
 from gym_ignition.rbd.conversions import Rotation
 from gym_ignition.rbd.conversions import Transform
-from adherent.MANN.utils import denormalize
 from gym_ignition.rbd.conversions import Quaternion
-from adherent.MANN.utils import read_from_file
-from adherent.data_processing.utils import iCub
-import bipedal_locomotion_framework.bindings as blf
 from gym_ignition.rbd.idyntree import kindyncomputations
-from adherent.data_processing.utils import rotation_2D
-from adherent.trajectory_generation.utils import trajectory_blending
-from adherent.trajectory_generation.utils import load_output_mean_and_std
-from adherent.trajectory_generation.utils import compute_angle_wrt_x_positive_semiaxis
-from adherent.trajectory_generation.utils import load_component_wise_input_mean_and_std
+from adherent.trajectory_generation.utils import *
 from mann_pytorch.utils import get_latest_model_path
+from mann_pytorch.utils import denormalize
 
 import matplotlib as mpl
 mpl.rcParams['toolbar'] = 'None'
@@ -38,13 +22,7 @@ import matplotlib.pyplot as plt
 
 @dataclass
 class StorageHandler:
-    """Class to store all the quantities relevant in the trajectory generation pipeline and save data."""
-
-    # Storage paths for the footsteps, postural, joystick input and blending coefficients
-    footsteps_path: str
-    postural_path: str
-    joystick_input_path: str
-    blending_coefficients_path: str
+    """Class to store the quantities relevant in the trajectory generation pipeline."""
 
     # Time scaling factor for the trajectory
     time_scaling: int
@@ -55,30 +33,21 @@ class StorageHandler:
     initial_l_foot_position: List
     initial_r_foot_position: List
 
-    # Storage dictionaries for footsteps, postural, joystick input and blending coefficients
+    # Storage dictionaries for footsteps and posturals
     footsteps: Dict
-    posturals: Dict = field(default_factory=lambda: {'base': [], 'joints_pos': [], 'joints_vel': [], 'links': [], 'com_pos': [], 'com_vel': [], 'centroidal_momentum': []})
-    joystick_inputs: Dict = field(default_factory=lambda: {'raw_data': [], 'quad_bezier': [], 'base_velocities': [], 'facing_dirs': []})
-    blending_coeffs: Dict = field(default_factory=lambda: {'w_1': [], 'w_2': [], 'w_3': [], 'w_4': []})
+    posturals: Dict = field(default_factory=lambda: {'base': [], 'joints_pos': [], 'joints_vel': [], 'com_pos': [], 'com_vel': [], 'centroidal_momentum': []})
 
-    # Store footsteps and posturals at the mergepoint
+    # Storage dictionaries for footsteps and posturals at the mergepoint
     mergepoint_footsteps: Dict = field(default_factory=lambda: {})
     # mergepoint_posturals: Dict = field(default_factory=lambda: {}) # TODO
 
     @staticmethod
-    def build(storage_path: str,
-              feet_frames: Dict,
+    def build(feet_frames: Dict,
               initial_l_foot_position: List,
               initial_r_foot_position: List,
               generation_to_control_time_scaling: int,
               time_scaling: int = 1) -> "StorageHandler":
         """Build an instance of StorageHandler."""
-
-        # Storage paths for the footsteps, postural, joystick input and blending coefficients
-        footsteps_path = os.path.join(storage_path, "footsteps.txt")
-        postural_path = os.path.join(storage_path, "postural.txt")
-        joystick_input_path = os.path.join(storage_path, "joystick_input.txt")
-        blending_coefficients_path = os.path.join(storage_path, "blending_coefficients.txt")
 
         # Define initial left footstep
         initial_left_footstep = {}
@@ -97,49 +66,17 @@ class StorageHandler:
         # Initialize footsteps with initial left and right footsteps
         footsteps = {feet_frames["left_foot"]: [initial_left_footstep], feet_frames["right_foot"]: [initial_right_footstep]}
 
-        return StorageHandler(footsteps_path,
-                              postural_path,
-                              joystick_input_path,
-                              blending_coefficients_path,
-                              feet_frames=feet_frames,
+        return StorageHandler(feet_frames=feet_frames,
                               initial_l_foot_position=initial_l_foot_position,
                               initial_r_foot_position=initial_r_foot_position,
                               footsteps=footsteps,
                               generation_to_control_time_scaling=generation_to_control_time_scaling,
                               time_scaling=time_scaling)
 
-    def update_joystick_inputs_storage(self, raw_data: List, quad_bezier: List, base_velocities: List, facing_dirs: List) -> None:
-        """Update the storage of the joystick inputs."""
-
-        # Replicate the joystick inputs at the desired frequency
-        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
-
-            self.joystick_inputs["raw_data"].append(raw_data)
-            self.joystick_inputs["quad_bezier"].append(quad_bezier)
-            self.joystick_inputs["base_velocities"].append(base_velocities)
-            self.joystick_inputs["facing_dirs"].append(facing_dirs)
-
-    def update_blending_coefficients_storage(self, blending_coefficients: List) -> None:
-        """Update the storage of the blending coefficients."""
-
-        # Replicate the blending coefficients at the desired frequency
-        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
-
-            self.blending_coeffs["w_1"].append(float(blending_coefficients[0][0]))
-            self.blending_coeffs["w_2"].append(float(blending_coefficients[0][1]))
-            self.blending_coeffs["w_3"].append(float(blending_coefficients[0][2]))
-            self.blending_coeffs["w_4"].append(float(blending_coefficients[0][3]))
-
     def update_footsteps_storage(self, support_foot: str, footstep: Dict) -> None:
         """Add a footstep to the footsteps storage."""
 
         self.footsteps[support_foot].append(footstep)
-
-    # TODO: remove?
-    def replace_footsteps_storage(self, footsteps: Dict) -> None:
-        """Replace the storage of footsteps with an updated footsteps list."""
-
-        self.footsteps = footsteps
 
     def retrieve_smoothed_dict(self, prev: Dict, next: Dict, steps: int) -> List:
         """Compute a list of dictionaries which smoothly transition from the previous dictionary to the next one.
@@ -183,7 +120,7 @@ class StorageHandler:
         return smoothed_list
 
     def update_posturals_storage(self, base: Dict, joints_pos: Dict, joints_vel: Dict,
-                                 links: Dict, com_pos: List, com_vel: List, centroidal_momentum: List) -> None:
+                                 com_pos: List, com_vel: List, centroidal_momentum: List) -> None:
         """Update the storage of the posturals."""
 
         # ======
@@ -291,171 +228,6 @@ class StorageHandler:
             smoothed_centroidal_momentum = [[smoothed_linear_momentum[k], smoothed_angular_momentum[k]] for k in range(len(smoothed_linear_momentum))]
             self.posturals["centroidal_momentum"].extend(smoothed_centroidal_momentum)
 
-    # TODO: integrate once we define the message to be passed via YARP
-    # def retrieve_contacts(self, plot_contacts: bool = False) -> blf.contacts.ContactPhaseList:
-    #     """Retrieve planned contacts from the generated trajectory, and optionally plot them."""
-    #
-    #     # Footsteps list
-    #     contact_phase_list: blf.contacts.ContactPhaseList
-    #
-    #     # Create the map of contact lists
-    #     contact_list_map = dict()
-    #     contact_list_map[self.feet_frames["left_foot"]] = blf.contacts.ContactList()
-    #     contact_list_map[self.feet_frames["right_foot"]] = blf.contacts.ContactList()
-    #
-    #     # Retrieve footsteps
-    #     l_contacts = self.footsteps[self.feet_frames["left_foot"]]
-    #     r_contacts = self.footsteps[self.feet_frames["right_foot"]]
-    #
-    #     if plot_contacts:
-    #         # Storage fot plotting
-    #         left_footsteps_x = []
-    #         left_footsteps_y = []
-    #         right_footsteps_x = []
-    #         right_footsteps_y = []
-    #
-    #     # ================
-    #     # INITIAL CONTACTS
-    #     # ================
-    #
-    #     # Retrieve first left contact position # TODO: remove and rename
-    #     ground_l_foot_position = l_contacts[0]["pos"]
-    #     ground_l_foot_position_offset = np.array(self.initial_l_foot_position) - np.array(ground_l_foot_position)
-    #     ground_l_foot_position += np.array(ground_l_foot_position_offset)
-    #
-    #     # Retrieve first left contact orientation
-    #     l_foot_quat = l_contacts[0]["quat"]
-    #     l_deactivation_time = self.time_scaling * (l_contacts[0]["deactivation_time"])
-    #
-    #     # Retrieve first right contact position # TODO: remove and rename
-    #     ground_r_foot_position = r_contacts[0]["pos"]
-    #     ground_r_foot_position_offset = np.array(self.initial_r_foot_position) - np.array(ground_r_foot_position)
-    #     ground_r_foot_position += np.array(ground_r_foot_position_offset)
-    #
-    #     # Retrieve first right contact orientation
-    #     r_foot_quat = r_contacts[0]["quat"]
-    #     r_deactivation_time = self.time_scaling * (r_contacts[0]["deactivation_time"])
-    #
-    #     # Add initial left and right contacts to the list
-    #     assert contact_list_map[self.feet_frames["left_foot"]].add_contact(
-    #         transform=manif.SE3(position=np.array(ground_l_foot_position),
-    #                             quaternion=l_foot_quat),
-    #         activation_time=0.0,
-    #         deactivation_time=l_deactivation_time)
-    #     assert contact_list_map[self.feet_frames["right_foot"]].add_contact(
-    #         transform=manif.SE3(position=np.array(ground_r_foot_position),
-    #                             quaternion=r_foot_quat),
-    #         activation_time=0.0,
-    #         deactivation_time=r_deactivation_time)
-    #
-    #     # =============
-    #     # LEFT CONTACTS
-    #     # =============
-    #
-    #     if plot_contacts:
-    #         # Update storage for plotting
-    #         left_footsteps_x.append(ground_l_foot_position[0])
-    #         left_footsteps_y.append(ground_l_foot_position[1])
-    #
-    #     for contact in l_contacts[1:]:
-    #
-    #         # Retrieve position
-    #         ground_l_foot_position = contact["pos"]
-    #         ground_l_foot_position += np.array(ground_l_foot_position_offset) # TODO: remove
-    #
-    #         if plot_contacts:
-    #             # Update storage for plotting
-    #             left_footsteps_x.append(ground_l_foot_position[0])
-    #             left_footsteps_y.append(ground_l_foot_position[1])
-    #
-    #         # Retrieve orientation and timing
-    #         l_foot_quat = contact["quat"]
-    #         l_activation_time = self.time_scaling * (contact["activation_time"])
-    #         l_deactivation_time = self.time_scaling * (contact["deactivation_time"])
-    #
-    #         # Add the contact
-    #         assert contact_list_map[self.feet_frames["left_foot"]].add_contact(
-    #             transform=manif.SE3(position=np.array(ground_l_foot_position), quaternion=l_foot_quat),
-    #             activation_time=l_activation_time,
-    #             deactivation_time=l_deactivation_time)
-    #
-    #     # ==============
-    #     # RIGHT CONTACTS
-    #     # ==============
-    #
-    #     if plot_contacts:
-    #         # Update storage for plotting
-    #         right_footsteps_x.append(ground_r_foot_position[0])
-    #         right_footsteps_y.append(ground_r_foot_position[1])
-    #
-    #     for contact in r_contacts[1:]:
-    #
-    #         # Retrieve position
-    #         ground_r_foot_position = contact["pos"]
-    #         ground_r_foot_position += np.array(ground_r_foot_position_offset)  # TODO: remove
-    #
-    #         if plot_contacts:
-    #             # Update storage for plotting
-    #             right_footsteps_x.append(ground_r_foot_position[0])
-    #             right_footsteps_y.append(ground_r_foot_position[1])
-    #
-    #         # Retrieve orientation and timing
-    #         r_foot_quat = contact["quat"]
-    #         r_activation_time = self.time_scaling * (contact["activation_time"])
-    #         r_deactivation_time = self.time_scaling * (contact["deactivation_time"])
-    #
-    #         # Add the contact
-    #         assert contact_list_map[self.feet_frames["right_foot"]].add_contact(
-    #             transform=manif.SE3(position=np.array(ground_r_foot_position), quaternion=r_foot_quat),
-    #             activation_time=r_activation_time,
-    #             deactivation_time=r_deactivation_time)
-    #
-    #     # ====
-    #     # PLOT
-    #     # ====
-    #
-    #     if plot_contacts:
-    #         # Plot contacts
-    #         plt.figure()
-    #         plt.plot(left_footsteps_x, left_footsteps_y, 'b', label='left contacts')
-    #         plt.plot(right_footsteps_x, right_footsteps_y, 'r', label='right contacts')
-    #         plt.scatter(left_footsteps_x, left_footsteps_y, c='b')
-    #         plt.scatter(right_footsteps_x, right_footsteps_y, c='r')
-    #         plt.legend()
-    #         plt.title("Contacts")
-    #         plt.axis("equal")
-    #         plt.show(block=False)
-    #         plt.pause(0.5)
-    #
-    #     # Assign contact list
-    #     contact_phase_list = blf.contacts.ContactPhaseList()
-    #     contact_phase_list.set_lists(contact_lists=contact_list_map)
-    #
-    #     return contact_phase_list
-
-    # TODO: remove
-    def save_data_as_json(self) -> None:
-        """Save all the stored data using the json format."""
-
-        # Save footsteps
-        with open(self.footsteps_path, 'w') as outfile:
-            json.dump(self.footsteps, outfile)
-
-        # Save postural
-        with open(self.postural_path, 'w') as outfile:
-            json.dump(self.posturals, outfile)
-
-        # Save joystick inputs
-        with open(self.joystick_input_path, 'w') as outfile:
-            json.dump(self.joystick_inputs, outfile)
-
-        # Save blending coefficients
-        with open(self.blending_coefficients_path, 'w') as outfile:
-            json.dump(self.blending_coeffs, outfile)
-
-        # Debug
-        input("\nData have been saved. Press Enter to continue the trajectory generation.")
-
     def update_mergepoint_state(self) -> None:
         """Update the storage of footsteps and postural at the last mergepoint."""
 
@@ -493,10 +265,12 @@ class FootstepsExtractor:
     # Time scaling factor for the generated trajectory
     time_scaling: int
 
-    # Auxiliary variables for the footsteps update before saving
-    nominal_DS_duration: float
+    # Auxiliary variables to check close footsteps
     difference_position_threshold: float
     difference_time_threshold: float
+
+    # Auxiliary variable to fix missing deactivation times
+    nominal_DS_duration: float
 
     # Auxiliary variables to handle the footsteps deactivation time
     difference_height_norm_threshold: bool
@@ -507,7 +281,7 @@ class FootstepsExtractor:
               time_scaling: int = 1,
               nominal_DS_duration: float = 0.04,
               difference_position_threshold: float = 0.04,
-              difference_time_threshold: float = 0.10, # TODO: tune
+              difference_time_threshold: float = 0.10,
               difference_height_norm_threshold: bool = 0.005) -> "FootstepsExtractor":
         """Build an instance of FootstepsExtractor."""
 
@@ -575,25 +349,6 @@ class FootstepsExtractor:
         return new_footstep
 
     # TODO: remove (and do it online if needed)
-    def update_footsteps(self, final_deactivation_time: float, footsteps: Dict) -> Dict:
-        """Update the footsteps list before saving data by replacing temporary deactivation times (if any) and
-        merging footsteps which are too close each other in order to avoid unintended footsteps on the spot.
-        """
-
-        # Update the deactivation time of the last footstep of each foot (they need to coincide to be processed
-        # properly in the trajectory control layer)
-        for foot in footsteps.keys():
-            footsteps[foot][-1]["deactivation_time"] = self.time_scaling * final_deactivation_time
-        # Replace temporary deactivation times in the footsteps list (if any)
-        updated_footsteps = self.replace_temporary_deactivation_times(footsteps=footsteps)
-
-        # Merge footsteps which are too close each other
-        updated_footsteps = self.merge_close_footsteps(final_deactivation_time=final_deactivation_time,
-                                                       footsteps=updated_footsteps)
-
-        return updated_footsteps
-
-    # TODO: remove (and do it online if needed)
     def replace_temporary_deactivation_times(self, footsteps: Dict) -> Dict:
         """Replace temporary footstep deactivation times that may not have been updated properly."""
 
@@ -627,62 +382,11 @@ class FootstepsExtractor:
 
         return footsteps
 
-    # TODO: remove (and do it online if needed)
-    def merge_close_footsteps(self, final_deactivation_time: float, footsteps: Dict) -> Dict:
-        """Merge footsteps that are too close each other (in terms of space and time) to avoid unintended footsteps on the spot."""
-
-        # Initialize updated footsteps list
-        updated_footsteps = {self.feet_frames["left_foot"]: [], self.feet_frames["right_foot"]: []}
-
-        for foot in footsteps.keys():
-
-            # Auxiliary variable to handle footsteps update
-            skip_next_contact = False
-
-            for i in range(len(footsteps[foot]) - 1):
-
-                if skip_next_contact:
-                    skip_next_contact = False
-                    continue
-
-                # Compute the norm of the difference in position between consecutive footsteps of the same foot
-                current_footstep_position = np.array(footsteps[foot][i]["pos"])
-                next_footstep_position = np.array(footsteps[foot][i + 1]["pos"])
-                difference_position = np.linalg.norm(current_footstep_position - next_footstep_position)
-
-                # Compute the difference in time between consecutive footsteps of the same foot
-                current_footstep_deactivation = np.array(footsteps[foot][i]["deactivation_time"])
-                next_footstep_activation = np.array(footsteps[foot][i + 1]["activation_time"])
-                difference_time = next_footstep_activation - current_footstep_deactivation
-
-                if difference_position >= self.difference_position_threshold or \
-                        (difference_position < self.difference_position_threshold and
-                         difference_time >= self.time_scaling * self.difference_time_threshold):
-
-                    # Do not update footsteps which are not enough close each other (in terms of both time and space)
-                    updated_footsteps[foot].append(footsteps[foot][i])
-
-                else:
-
-                    # Merge footsteps which are close each other: the duration of the current footstep is extended
-                    # till the end of the subsequent footstep
-                    updated_footstep = footsteps[foot][i]
-                    updated_footstep["deactivation_time"] = footsteps[foot][i + 1]["deactivation_time"]
-                    updated_footsteps[foot].append(updated_footstep)
-                    skip_next_contact = True
-
-            # If the last updated footstep ends before the final deactivation time, add the last original footstep
-            # to the updated list of footsteps
-            if updated_footsteps[foot]==[] or updated_footsteps[foot][-1]["deactivation_time"] != final_deactivation_time * self.time_scaling:
-                updated_footsteps[foot].append(footsteps[foot][-1])
-
-        return updated_footsteps
-
     def check_close_footsteps(self, current_footstep: Dict, next_footstep: Dict) -> bool:
         """Check whether the current and the next footsteps are too close each other
         (in terms of space and time) to avoid unintended footsteps on the spot."""
 
-        # TODO: prev foorstep need to be of the same foot! Where is this guaranteed?
+        # TODO: prev footstep needs to be of the same foot! Where is this guaranteed?
 
         close_footsteps = False
 
@@ -690,28 +394,16 @@ class FootstepsExtractor:
         current_footstep_position = np.array(current_footstep["pos"])
         next_footstep_position = np.array(next_footstep["pos"])
         difference_position = np.linalg.norm(current_footstep_position - next_footstep_position)
-        # Debug # TODO: remove
-        # print("current_footstep_position: ", current_footstep_position)
-        # print("next_footstep_position: ", next_footstep_position)
-        # print("difference position: ", difference_position)
 
         # Compute the norm of the difference in time between current and next footsteps
         current_footstep_deactivation = np.array(current_footstep["deactivation_time"])
         next_footstep_activation = np.array(next_footstep["activation_time"])
         difference_time = next_footstep_activation - current_footstep_deactivation
-        # Debug # TODO: remove
-        # print("current_footstep_deactivation: ", current_footstep_deactivation)
-        # print("next_footstep_activation: ", next_footstep_activation)
-        # print("difference_time: ", difference_time)# TODO: is this wrong because of the -1?
 
         # Check whether the footsteps are close in position OR in time
         if difference_position < self.difference_position_threshold or \
                 (current_footstep_deactivation != -1 and
                  difference_time < self.time_scaling * self.difference_time_threshold):
-        # TODO: possibly check whether the footsteps are close in position AND in time ?
-        # if difference_position < self.difference_position_threshold and \
-        #         (current_footstep_deactivation == -1 or
-        #          difference_time < self.time_scaling * self.difference_time_threshold):
 
             close_footsteps = True
 
@@ -730,7 +422,7 @@ class PosturalExtractor:
 
     @staticmethod
     def create_new_posturals(base_position: List, base_quaternion: List, joint_positions: List, controlled_joints: List,
-                             kindyn: kindyncomputations.KinDynComputations, link_names: List) -> (List, List, List, List):
+                             kindyn: kindyncomputations.KinDynComputations) -> (List, List, List, List, List, List):
         """Retrieve the information related to a new set of postural terms."""
 
         # Store the postural term related to the base position and orientation
@@ -743,14 +435,6 @@ class PosturalExtractor:
         joint_velocities = kindyn.get_joint_velocities()
         new_joints_vel_postural = {controlled_joints[k]: joint_velocities[k] for k in range(len(controlled_joints))}
 
-        # Store the postural term related to the link orientations
-        new_links_postural = {}
-        world_H_base = kindyn.get_world_base_transform()
-        for link_name in link_names:
-            base_H_link = kindyn.get_relative_transform(ref_frame_name="root_link", frame_name=link_name)
-            world_H_link = world_H_base.dot(base_H_link)
-            new_links_postural[link_name] = list(Quaternion.from_matrix(world_H_link[0:3, 0:3]))
-
         # Store the postural term related to the com positions
         new_com_pos_postural = list(kindyn.get_com_position())
 
@@ -761,7 +445,7 @@ class PosturalExtractor:
         centroidal_momentum = list(kindyn.get_centroidal_momentum())
         new_centroidal_momentum_postural = [list(centroidal_momentum[0]),list(centroidal_momentum[1])]
 
-        return new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
+        return new_base_postural, new_joints_pos_postural, new_joints_vel_postural, \
                new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural
 
 
@@ -1053,26 +737,12 @@ class KinematicComputations:
         # Retrieve the vertices positions in the world frame
         W_vertices_positions = self.compute_W_vertices_pos()
 
-        # TODO: remove this temporary fix
-        # if iteration == 5:
-        #     # After a few iterations, force the current support vertex to switch to the other foot (so that you do not miss the initial contacts)
-        #     self.support_vertex = (self.support_vertex + 4) % 8
-        #     print("iteration:", iteration, "support_vertex:", self.support_vertex)
-        # else:
-        #     # Compute the current support vertex
-        #     vertices_heights = [W_vertex[2] for W_vertex in W_vertices_positions]
-        #     self.support_vertex = np.argmin(vertices_heights)
-
         # Compute the current support vertex
         vertices_heights = [W_vertex[2] for W_vertex in W_vertices_positions]
         self.support_vertex = np.argmin(vertices_heights)
 
         # Check whether the deactivation time of the last footstep needs to be updated
         update_footstep_deactivation_time = self.footsteps_extractor.should_update_footstep_deactivation_time(kindyn=self.kindyn)
-
-        # Debug # TODO: remove
-        # print("UPDATE DEACTIVATION?", update_footstep_deactivation_time)
-        # input()
 
         # If the support vertex did not change
         if self.support_vertex == self.support_vertex_prev:
@@ -1095,9 +765,6 @@ class KinematicComputations:
 
             # If the support foot changed
             if self.support_foot != self.support_foot_prev:
-
-                # Debug # TODO: remove
-                # print("SF changed from ", self.support_foot_prev, " to ", self.support_foot)
 
                 # Indicate that a new footstep needs to be added to the footsteps list
                 update_footsteps_list = True
@@ -1165,54 +832,18 @@ class Plotter:
     # Define colors used to print the footsteps
     footsteps_colors: Dict
 
-    # Axis of the composed ellipsoid constraining the last point of the Bezier curve of base positions
-    ellipsoid_forward_axis: float
-    ellipsoid_side_axis: float
-    ellipsoid_backward_axis: float
-
-    # Scaling factor for all the axes of the composed ellipsoid
-    ellipsoid_scaling: float
-
     @staticmethod
-    def build(feet_frames: Dict,
-              ellipsoid_forward_axis: float = 1.0,
-              ellipsoid_side_axis: float = 0.9,
-              ellipsoid_backward_axis: float = 0.6,
-              ellipsoid_scaling: float = 0.4) -> "Plotter":
+    def build(feet_frames: Dict) -> "Plotter":
         """Build an instance of Plotter."""
 
         # Default footsteps color: blue
         footsteps_colors = {feet_frames["left_foot"]: 'b', feet_frames["right_foot"]: 'b'}
 
         return Plotter(feet_frames=feet_frames,
-                       footsteps_colors=footsteps_colors,
-                       ellipsoid_forward_axis=ellipsoid_forward_axis,
-                       ellipsoid_side_axis=ellipsoid_side_axis,
-                       ellipsoid_backward_axis=ellipsoid_backward_axis,
-                       ellipsoid_scaling=ellipsoid_scaling)
+                       footsteps_colors=footsteps_colors)
 
-    @staticmethod
-    def plot_blending_coefficients(figure_blending_coefficients: int, blending_coeffs: Dict) -> None:
-        """Plot the activations of the blending coefficients."""
-
-        plt.figure(figure_blending_coefficients)
-        plt.clf()
-
-        # Plot blending coefficients
-        plt.plot(range(len(blending_coeffs["w_1"])), blending_coeffs["w_1"], 'r')
-        plt.plot(range(len(blending_coeffs["w_2"])), blending_coeffs["w_2"], 'b')
-        plt.plot(range(len(blending_coeffs["w_3"])), blending_coeffs["w_3"], 'g')
-        plt.plot(range(len(blending_coeffs["w_4"])), blending_coeffs["w_4"], 'y')
-
-        # Plot configuration
-        plt.title("Blending coefficients profiles")
-        plt.ylabel("Blending coefficients")
-        plt.xlabel("Time [s]")
-
-    def plot_new_footstep(self, figure_footsteps: int, support_foot: str, new_footstep: Dict) -> None:
+    def plot_new_footstep(self, support_foot: str, new_footstep: Dict) -> None:
         """Plot a new footstep just added to the footsteps list."""
-
-        plt.figure(figure_footsteps)
 
         # Footstep position
         plt.scatter(new_footstep["pos"][1], -new_footstep["pos"][0], c=self.footsteps_colors[support_foot])
@@ -1232,184 +863,6 @@ class Plotter:
         # Plot
         plt.show()
         plt.pause(0.5)
-
-    @staticmethod
-    def plot_predicted_future_trajectory(figure_facing_dirs: int, figure_base_vel: int, denormalized_current_output: List) -> None:
-        """Plot the future trajectory predicted by the network (magenta)."""
-
-        # Retrieve predicted base positions, facing directions and base velocities from the denormalized network output
-        predicted_base_pos = denormalized_current_output[0:12]
-        predicted_facing_dirs = denormalized_current_output[12:24]
-        predicted_base_vel = denormalized_current_output[24:36]
-
-        plt.figure(figure_facing_dirs)
-
-        for k in range(0, len(predicted_base_pos), 2):
-
-            # Plot base positions
-            base_position = [predicted_base_pos[k], predicted_base_pos[k + 1]]
-            plt.scatter(-base_position[1], base_position[0], c='m')
-
-            # Plot facing directions (scaled for visualization purposes)
-            facing_direction = [predicted_facing_dirs[k] / 10, predicted_facing_dirs[k + 1] / 10]
-            plt.plot([-base_position[1], -base_position[1] - facing_direction[1]],
-                     [base_position[0], base_position[0] + facing_direction[0]],
-                     'm')
-
-        plt.figure(figure_base_vel)
-
-        for k in range(0, len(predicted_base_pos), 2):
-
-            # Plot base positions
-            base_position = [predicted_base_pos[k], predicted_base_pos[k + 1]]
-            plt.scatter(-base_position[1], base_position[0], c='m')
-
-            # Plot base velocities (scaled for visualization purposes)
-            base_velocity = [predicted_base_vel[k] / 10, predicted_base_vel[k + 1] / 10]
-            plt.plot([-base_position[1], -base_position[1] - base_velocity[1]],
-                     [base_position[0], base_position[0] + base_velocity[0]],
-                     'm')
-
-    @staticmethod
-    def plot_desired_future_trajectory(figure_facing_dirs: int, figure_base_vel: int,
-                                       quad_bezier: List, facing_dirs: List, base_velocities: List) -> None:
-        """Plot the future trajectory built from user inputs (gray)."""
-
-        # Retrieve components for plotting
-        quad_bezier_x = [elem[0] for elem in quad_bezier]
-        quad_bezier_y = [elem[1] for elem in quad_bezier]
-
-        plt.figure(figure_facing_dirs)
-
-        # Plot base positions
-        plt.scatter(quad_bezier_x, quad_bezier_y, c='gray')
-
-        # Plot facing directions (scaled for visualization purposes)
-        for k in range(len(quad_bezier)):
-            plt.plot([quad_bezier_x[k], quad_bezier_x[k] + facing_dirs[k][0] / 10],
-                     [quad_bezier_y[k], quad_bezier_y[k] + facing_dirs[k][1] / 10],
-                     c='gray')
-
-        plt.figure(figure_base_vel)
-
-        # Plot base positions
-        plt.scatter(quad_bezier_x, quad_bezier_y, c='gray')
-
-        # Plot base velocities (scaled for visualization purposes)
-        for k in range(len(quad_bezier)):
-            plt.plot([quad_bezier_x[k], quad_bezier_x[k] + base_velocities[k][0] / 10],
-                     [quad_bezier_y[k], quad_bezier_y[k] + base_velocities[k][1] / 10],
-                     c='gray')
-
-    @staticmethod
-    def plot_blended_future_trajectory(figure_facing_dirs: int, figure_base_vel: int, blended_base_positions: List,
-                                       blended_facing_dirs: List, blended_base_velocities: List) -> None:
-        """Plot the future trajectory obtained by blending the network output and the user input (green)."""
-
-        # Extract components for plotting
-        blended_base_positions_x = [elem[0] for elem in blended_base_positions]
-        blended_base_positions_y = [elem[1] for elem in blended_base_positions]
-
-        plt.figure(figure_facing_dirs)
-
-        # Plot base positions
-        plt.scatter(blended_base_positions_x, blended_base_positions_y, c='g')
-
-        # Plot facing directions (scaled for visualization purposes)
-        for k in range(len(blended_base_positions)):
-            plt.plot([blended_base_positions_x[k], blended_base_positions_x[k] + blended_facing_dirs[k][0] / 10],
-                     [blended_base_positions_y[k], blended_base_positions_y[k] + blended_facing_dirs[k][1] / 10],
-                     c='g')
-
-        plt.figure(figure_base_vel)
-
-        # Plot base positions
-        plt.scatter(blended_base_positions_x, blended_base_positions_y, c='g')
-
-        # Plot base velocities (scaled for visualization purposes)
-        for k in range(len(blended_base_positions)):
-            plt.plot([blended_base_positions_x[k], blended_base_positions_x[k] + blended_base_velocities[k][0] / 10],
-                     [blended_base_positions_y[k], blended_base_positions_y[k] + blended_base_velocities[k][1] / 10],
-                     c='g')
-
-    def plot_trajectory_blending(self, figure_facing_dirs: int, figure_base_vel: int, denormalized_current_output: List,
-                                 quad_bezier: List, facing_dirs: List, base_velocities: List, blended_base_positions: List,
-                                 blended_facing_dirs: List, blended_base_velocities: List) -> None:
-        """Plot the predicted, desired and blended future ground trajectories used to build the next network input."""
-
-        # Facing directions plot
-        plt.figure(figure_facing_dirs)
-        plt.clf()
-
-        # Plot the reference frame
-        plt.scatter(0, 0, c='k')
-        plt.plot([0, 0], [0, 1 / 10], 'k')
-
-        # Plot upper semi-ellipse of the composed ellipsoid on which the last point of the Bezier curve is constrained
-        a = self.ellipsoid_side_axis * self.ellipsoid_scaling
-        b = self.ellipsoid_forward_axis * self.ellipsoid_scaling
-        x_coord = np.linspace(-a, a, 1000)
-        y_coord = b * np.sqrt( 1 - (x_coord ** 2)/(a ** 2))
-        plt.plot(x_coord, y_coord, 'k')
-
-        # Plot lower semi-ellipse of the composed ellipsoid on which the last point of the Bezier curve is constrained
-        a = self.ellipsoid_side_axis * self.ellipsoid_scaling
-        b = self.ellipsoid_backward_axis * self.ellipsoid_scaling
-        x_coord = np.linspace(-a, a, 1000)
-        y_coord = b * np.sqrt( 1 - (x_coord ** 2)/(a ** 2))
-        plt.plot(x_coord, -y_coord, 'k')
-
-        # Base velocities plot
-        plt.figure(figure_base_vel)
-        plt.clf()
-
-        # Plot the reference frame
-        plt.scatter(0, 0, c='k')
-        plt.plot([0, 0], [0, 1 / 10], 'k')
-
-        # Plot upper semi-ellipse of the composed ellipsoid on which the last point of the Bezier curve is constrained
-        a = self.ellipsoid_side_axis * self.ellipsoid_scaling
-        b = self.ellipsoid_forward_axis * self.ellipsoid_scaling
-        x_coord = np.linspace(-a, a, 1000)
-        y_coord = b * np.sqrt( 1 - (x_coord ** 2)/(a ** 2))
-        plt.plot(x_coord, y_coord, 'k')
-
-        # Plot lower semi-ellipse of the composed ellipsoid on which the last point of the Bezier curve is constrained
-        a = self.ellipsoid_side_axis * self.ellipsoid_scaling
-        b = self.ellipsoid_backward_axis * self.ellipsoid_scaling
-        x_coord = np.linspace(-a, a, 1000)
-        y_coord = b * np.sqrt( 1 - (x_coord ** 2)/(a ** 2))
-        plt.plot(x_coord, -y_coord, 'k')
-
-        # Plot the future trajectory predicted by the network
-        self.plot_predicted_future_trajectory(figure_facing_dirs=figure_facing_dirs, figure_base_vel=figure_base_vel,
-                                              denormalized_current_output=denormalized_current_output)
-
-        # Plot the future trajectory built from user inputs
-        self.plot_desired_future_trajectory(figure_facing_dirs=figure_facing_dirs, figure_base_vel=figure_base_vel,
-                                            quad_bezier=quad_bezier, facing_dirs=facing_dirs, base_velocities=base_velocities)
-
-        # Plot the future trajectory obtained by blending the network output and the user input
-        self.plot_blended_future_trajectory(figure_facing_dirs=figure_facing_dirs, figure_base_vel=figure_base_vel,
-                                            blended_base_positions=blended_base_positions,
-                                            blended_facing_dirs=blended_facing_dirs,
-                                            blended_base_velocities=blended_base_velocities)
-
-        # Configure facing directions plot
-        plt.figure(figure_facing_dirs)
-        plt.axis('scaled')
-        plt.xlim([-0.5, 0.5])
-        plt.ylim([-0.3, 0.5])
-        plt.axis('off')
-        plt.title("INTERPOLATED TRAJECTORY (FACING DIRECTIONS)")
-
-        # Configure base velocities plot
-        plt.figure(figure_base_vel)
-        plt.axis('scaled')
-        plt.xlim([-0.5, 0.5])
-        plt.ylim([-0.3, 0.5])
-        plt.axis('off')
-        plt.title("INTERPOLATED TRAJECTORY (BASE VELOCITIES)")
 
     def reset_from_mergepoint(self):
         """Reset the color to print the footsteps when the generation restarts from the last mergepoint."""
@@ -1963,7 +1416,6 @@ class TrajectoryGenerator:
               gazebo: scenario.GazeboSimulator,
               kindyn: kindyncomputations.KinDynComputations,
               controlled_joints_indexes: List,
-              storage_path: str,
               training_path: str,
               local_foot_vertices_pos: List,
               feet_frames: Dict,
@@ -1989,10 +1441,6 @@ class TrajectoryGenerator:
               tau_facing_dirs: float = 1.3,
               tau_base_velocities: float = 1.3,
               nn_X_difference_norm_threshold: float = 0.05,
-              ellipsoid_forward_axis: float = 1.0,
-              ellipsoid_side_axis: float = 0.9,
-              ellipsoid_backward_axis: float = 0.6,
-              ellipsoid_scaling: float = 0.4,
               generation_rate: float = 1/50,
               control_rate: float = 1/100) -> "TrajectoryGenerator":
         """Build an instance of TrajectoryGenerator."""
@@ -2017,8 +1465,7 @@ class TrajectoryGenerator:
 
         # Build the storage handler component
         generation_to_control_time_scaling = int(generation_rate / control_rate)
-        storage = StorageHandler.build(storage_path=storage_path,
-                                       feet_frames=feet_frames,
+        storage = StorageHandler.build(feet_frames=feet_frames,
                                        initial_l_foot_position=initial_l_foot_position,
                                        initial_r_foot_position=initial_r_foot_position,
                                        time_scaling=time_scaling,
@@ -2041,11 +1488,7 @@ class TrajectoryGenerator:
                                               nn_X_difference_norm_threshold=nn_X_difference_norm_threshold)
 
         # Build the plotter component
-        plotter = Plotter.build(feet_frames=feet_frames,
-                                ellipsoid_forward_axis=ellipsoid_forward_axis,
-                                ellipsoid_side_axis=ellipsoid_side_axis,
-                                ellipsoid_backward_axis=ellipsoid_backward_axis,
-                                ellipsoid_scaling=ellipsoid_scaling)
+        plotter = Plotter.build(feet_frames=feet_frames)
 
         # Build the learned model component
         model = LearnedModel.build(training_path=training_path)
@@ -2143,21 +1586,10 @@ class TrajectoryGenerator:
                 next_footstep=new_footstep,
             )
 
-            # Debug TODO: remove
-            # print("New footstep:", new_footstep)
-            # print("Close footsteps?", close_footsteps)
-            # input()
-
             if not close_footsteps:
 
                 # Update the footsteps storage
                 self.storage.update_footsteps_storage(support_foot=support_foot, footstep=new_footstep)
-
-                # Debug TODO: remove
-                # for foot in self.storage.footsteps.keys():
-                #     print("##################################################", foot)
-                #     for elem in self.storage.footsteps[foot]:
-                #         print(elem)
 
                 # Increase the number of footsteps
                 self.n_steps += 1
@@ -2177,8 +1609,7 @@ class TrajectoryGenerator:
         return support_foot, update_footsteps_list
 
     def compute_kinematically_fasible_base_and_update_posturals(self, joint_positions: List, joint_velocities: List,
-                                                                base_quaternion: List, controlled_joints: List,
-                                                                link_names: List) -> (List, List, List, List):
+                                                                base_quaternion: List, controlled_joints: List) -> (List, List, List, List, List, List):
         """Compute kinematically-feasible base position and retrieve updated posturals."""
 
         # Compute and apply kinematically-feasible base position
@@ -2188,16 +1619,15 @@ class TrajectoryGenerator:
                                                                                          base_quaternion=base_quaternion)
 
         # Retrieve new posturals to be added to the list of posturals
-        new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
+        new_base_postural, new_joints_pos_postural, new_joints_vel_postural, \
         new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural = \
             self.kincomputations.postural_extractor.create_new_posturals(base_position=kinematically_feasible_base_position,
                                                                          base_quaternion=base_quaternion,
                                                                          joint_positions=joint_positions,
                                                                          controlled_joints=controlled_joints,
-                                                                         kindyn=self.kincomputations.kindyn,
-                                                                         link_names=link_names)
+                                                                         kindyn=self.kincomputations.kindyn)
 
-        return new_base_postural, new_joints_pos_postural, new_joints_vel_postural, new_links_postural, \
+        return new_base_postural, new_joints_pos_postural, new_joints_vel_postural, \
                new_com_pos_postural, new_com_vel_postural, new_centroidal_momentum_postural
 
     def retrieve_joystick_inputs(self, input_port: yarp.BufferedPortBottle, quad_bezier: List, base_velocities: List,
@@ -2271,46 +1701,16 @@ class TrajectoryGenerator:
 
         return blended_base_positions, blended_facing_dirs, blended_base_velocities
 
-    # TODO: remove the save
-    def update_storages_and_save(self, blending_coefficients: List, base_postural: List, joints_pos_postural: List,
-                                 joint_vel_postural: List, links_postural: List, com_pos_postural: List,
-                                 com_vel_postural: List, centroidal_momentum_postural: List, raw_data: List,
-                                 quad_bezier: List, base_velocities: List, facing_dirs: List, stream_every_N_iterations: int,
-                                 plot_contacts: bool) -> None:
-        """Update the blending coefficients, posturals and joystick input storages and periodically save data."""
-
-        # TODO: remove (temporary fix to ignore the storage of the blending coefficients)
-        # # Update the blending coefficients storage
-        # self.storage.update_blending_coefficients_storage(blending_coefficients=blending_coefficients)
+    def update_storages(self, base_postural: List, joints_pos_postural: List,
+                        joint_vel_postural: List, com_pos_postural: List,
+                        com_vel_postural: List, centroidal_momentum_postural: List) -> None:
+        """Update the postural storages."""
 
         # Update the posturals storage
         self.storage.update_posturals_storage(base=base_postural, joints_pos=joints_pos_postural,
-                                              joints_vel=joint_vel_postural, links=links_postural,
+                                              joints_vel=joint_vel_postural,
                                               com_pos=com_pos_postural, com_vel=com_vel_postural,
                                               centroidal_momentum=centroidal_momentum_postural)
-
-        # Update joystick inputs storage
-        self.storage.update_joystick_inputs_storage(raw_data=raw_data, quad_bezier=quad_bezier,
-                                                    base_velocities=base_velocities, facing_dirs=facing_dirs)
-
-        # TODO: remove the save
-        # Periodically stream data
-        if self.iteration % stream_every_N_iterations == 0:
-
-            # TODO: remove (and do it online if needed)
-            # Before saving data, update the footsteps list
-            final_deactivation_time = self.iteration * self.generation_rate
-            updated_footsteps = self.kincomputations.footsteps_extractor.update_footsteps(
-                final_deactivation_time=final_deactivation_time, footsteps=self.storage.footsteps)
-            self.storage.replace_footsteps_storage(footsteps=updated_footsteps)
-
-            # TODO: integrate once we define the message to be passed via YARP
-            # Retrieve and optionally plot contacts for the controller
-            # contact_phase_list = self.storage.retrieve_contacts(plot_contacts=plot_contacts)
-
-            # TODO: remove the save
-            # Save data
-            # self.storage.save_data_as_json()
 
     def update_iteration_counter(self) -> None:
         """Update the counter for the iterations of the generator."""
@@ -2323,18 +1723,19 @@ class TrajectoryGenerator:
         self.iteration += 1
         self.n_iterations += 1
 
-    # TODO: also handle missing deactivation times at the beginning ?
     def preprocess_data(self) -> None:
         """Fix last contact deactivation time before streaming data."""
 
-        # Fix deactivation times
+        # Fix last contact deactivation times
         for foot in self.storage.footsteps.keys():
             self.storage.footsteps[foot][-1]["deactivation_time"] = self.iteration * self.generation_rate
 
-    # TODO: stream data (now this is just printing)
+        # TODO: fix missing deactivation times (only at the beginning?)
+
     def stream_data(self) -> None:
         """Stream data via a YARP port."""
 
+        # TODO: stream data (now this is just printing)
         print("\n\nDATA STREAM:")
 
         # Footsteps
