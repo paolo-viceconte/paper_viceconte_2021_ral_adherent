@@ -840,6 +840,26 @@ def define_initial_base_yaw(robot: str) -> List:
 
     return initial_base_yaw
 
+def define_initial_feet_positions(robot: str) -> (List, List):
+    """Define the robot-specific initial positions of the feet frames."""
+
+    if robot == "iCubV2_5":
+        l_foot_position = [0, 0.08, 0]
+        r_foot_position = [0, -0.08, 0]
+
+    elif robot == "iCubV3":
+        l_foot_position = [0, 0.08, 0]
+        r_foot_position = [0, -0.08, 0]
+
+    elif robot == "ergoCubV1":
+        l_foot_position = [0, 0.08, 0]
+        r_foot_position = [0, -0.08, 0]
+
+    else:
+        raise Exception("Initial feet position only defined for iCubV2_5, iCubV3 and ergoCubV1.")
+
+    return l_foot_position, r_foot_position
+
 def trajectory_blending(a0: List, a1: List, t: np.array, tau: float) -> List:
     """Blend the vectors a0 and a1 via:
            Blend(a0, a1, t, tau) = (1 - t^tau) a0 + t^tau a1

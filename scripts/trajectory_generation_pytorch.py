@@ -23,6 +23,7 @@ from adherent.data_processing.utils import define_frontal_base_direction
 from adherent.data_processing.utils import define_frontal_chest_direction
 from adherent.trajectory_generation.utils import define_base_pitch_offset
 from adherent.trajectory_generation.utils import define_initial_base_height
+from adherent.trajectory_generation.utils import define_initial_feet_positions
 from adherent.trajectory_generation.utils import define_initial_past_trajectory
 from adherent.trajectory_generation.utils import define_initial_support_foot_and_vertex
 
@@ -39,11 +40,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--storage_path", help="Path where the generated trajectory will be stored. Relative path from script folder.",
                     type=str, default="../datasets/inference/")
 parser.add_argument("--training_path", help="Path where the training-related data are stored. Relative path from script folder.",
-                    # type=str, default="../datasets/training_subsampled_mirrored_D2_D3_20230319-112816/")
                     type = str, default = "../datasets/training_subsampled_mirrored_D2_D3_20230320-190551/")
-
-parser.add_argument("--save_every_N_iterations", help="Data will be saved every N iterations.",
-                    type=int, default=1000)
+parser.add_argument("--stream_every_N_steps", help="Data will be streamed every N steps.",
+                    type=int, default=3)
+parser.add_argument("--stream_every_N_iterations", help="If no steps are performed, data will be streamed every N iterations.",
+                    type=int, default=150) # TODO: tune
 parser.add_argument("--plot_trajectory_blending", help="Visualize the blending of the future ground trajectory to build the next network input.", action="store_true")
 parser.add_argument("--plot_footsteps", help="Visualize the footsteps.", action="store_true")
 parser.add_argument("--plot_blending_coefficients", help="Visualize blending coefficient activations.", action="store_true")
@@ -55,7 +56,8 @@ args = parser.parse_args()
 
 storage_path = args.storage_path
 training_path = args.training_path
-save_every_N_iterations = args.save_every_N_iterations
+stream_every_N_iterations = args.stream_every_N_iterations
+stream_every_N_steps = args.stream_every_N_steps
 plot_trajectory_blending = args.plot_trajectory_blending
 plot_footsteps = args.plot_footsteps
 plot_blending_coefficients = args.plot_blending_coefficients
@@ -165,6 +167,9 @@ feet_frames, feet_links = define_feet_frames_and_links(robot="ergoCubV1")
 # Define robot-specific initial support foot and vertex
 initial_support_foot, initial_support_vertex = define_initial_support_foot_and_vertex(robot="ergoCubV1")
 
+# Define robot-specific initial feet positions
+initial_l_foot_position, initial_r_foot_position = define_initial_feet_positions(robot="ergoCubV1")
+
 # Define robot-specific (and possibly training-dependent) base pitch offset
 base_pitch_offset = define_base_pitch_offset(robot="ergoCubV1")
 
@@ -186,6 +191,8 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
                                                            frontal_chest_direction=frontal_chest_dir,
                                                            initial_support_foot=initial_support_foot,
                                                            initial_support_vertex=initial_support_vertex,
+                                                           initial_l_foot_position=initial_l_foot_position,
+                                                           initial_r_foot_position=initial_r_foot_position,
                                                            time_scaling=time_scaling,
                                                            generation_rate=generation_rate,
                                                            control_rate=control_rate)
@@ -196,13 +203,28 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
 
 while True:
 
+    # Stream data every N steps (or if the maximum number of iterations without steps is reached)
+    if generator.get_n_steps() == stream_every_N_steps or generator.get_n_iterations() == stream_every_N_iterations:
+
+        # TODO: also handle missing deactivation times at the beginning ?
+        generator.preprocess_data()
+
+        # TODO: Stream data (now this is just printing)
+        generator.stream_data()
+
+        # Reset to the last mergepoint
+        generator.reset_from_mergepoint()
+
+        # Debug
+        input("Press Enter to proceed.")
+
     # Update the iteration counter
     generator.update_iteration_counter()
 
     # Retrieve the network output
     current_output, denormalized_current_output = generator.retrieve_network_output_pytorch()
 
-    # TODO: add the blending coefficients (it should be something like the following)
+    # TODO: remove (this is related to the blending coefficients)
     # # Retrieve the network output and the blending coefficients
     # current_output, denormalized_current_output, current_blending_coefficients = \
     #     generator.retrieve_network_output_and_blending_coefficients(nn_X=nn_X,
@@ -217,6 +239,20 @@ while True:
 
     # Handle first iteration differently
     if generator.iteration > 1:
+
+        # Initialize the mergepoint TODO: why not working at the very first iteration?
+        if generator.iteration == 2:
+
+            # Dummy mergepoint initialization
+            generator.autoregression.update_mergepoint_state()
+            generator.kincomputations.update_mergepoint_state()
+
+            # Plot the initial footsteps
+            if plot_footsteps:
+                for foot in generator.storage.footsteps:
+                    generator.plotter.plot_new_footstep(figure_footsteps=figure_footsteps,
+                                                        support_foot=foot,
+                                                        new_footstep=generator.storage.footsteps[foot][-1])
 
         # Update the support vertex position
         generator.update_support_vertex_position()
@@ -233,6 +269,7 @@ while True:
     # Update the support foot and vertex while detecting new footsteps
     support_foot, update_footsteps_list = generator.update_support_vertex_and_support_foot_and_footsteps()
 
+    # Plot the new footstep
     if update_footsteps_list and plot_footsteps:
 
         # Plot the last footstep
@@ -266,7 +303,7 @@ while True:
                                               base_velocities=base_velocities)
 
     # Update storage and periodically save data
-    generator.update_storages_and_save(blending_coefficients=[1,1,1,1], # TODO: temporary fix to handle blending coefficients
+    generator.update_storages_and_save(blending_coefficients=[1,1,1,1], # TODO: remove (temporary fix to handle blending coefficients)
                                        base_postural=new_base_postural,
                                        joints_pos_postural=new_joints_pos_postural,
                                        joint_vel_postural=new_joints_vel_postural,
@@ -278,10 +315,10 @@ while True:
                                        quad_bezier=quad_bezier,
                                        base_velocities=base_velocities,
                                        facing_dirs=facing_dirs,
-                                       save_every_N_iterations=save_every_N_iterations,
+                                       stream_every_N_iterations=stream_every_N_iterations,
                                        plot_contacts=plot_contacts)
 
-    # TODO: temporary deactivation of the blending coefficients plots
+    # TODO: remove (temporary deactivation of the blending coefficients plots)
     # if plot_trajectory_blending:
     #
     #     # Plot the trajectory blending
