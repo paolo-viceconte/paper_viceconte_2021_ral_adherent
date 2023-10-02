@@ -216,11 +216,11 @@ class JoystickDataProcessor:
     @staticmethod
     def build(device_path: str,
               base_vel_norm: float = 0.4,
-              ellipsoid_forward_axis: float = 1.0,
-              ellipsoid_side_axis: float = 0.9,
-              ellipsoid_backward_axis: float = 0.6,
+              ellipsoid_forward_axis: float = 3.0,
+              ellipsoid_side_axis: float = 0.3,
+              ellipsoid_backward_axis: float = 0.8,
               ellipsoid_scaling: float = 0.4,
-              max_facing_direction_angle_forward: float = math.pi/9,
+              max_facing_direction_angle_forward: float = math.pi/15,
               max_facing_direction_angle_backward: float = math.pi/30,
               max_facing_direction_angle_side_opposite_sign: float = math.pi/12,
               max_facing_direction_angle_side_same_sign: float = math.pi/18) -> "JoystickDataProcessor":
@@ -229,7 +229,8 @@ class JoystickDataProcessor:
         device = JoystickDevice.build()
         device.open_device(device_path=device_path)
 
-        control_point_offset = 0.1 * ellipsoid_scaling
+        # control_point_offset = 0.1 * ellipsoid_scaling
+        control_point_offset = 0 # Reduce complexity as in the C++ implmentation
 
         return JoystickDataProcessor(device=device,
                                      base_vel_norm=base_vel_norm,
