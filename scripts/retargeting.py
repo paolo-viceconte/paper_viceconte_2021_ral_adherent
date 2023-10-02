@@ -117,6 +117,13 @@ ik.initialize(verbosity=1,
               cost_tolerance=1e-4,
               floating_base=True)
 
+# Download: https://github.com/ami-iit/coinhsl-binary-packages/releases/download/v2019.05.21.0/coinhsl-2019.05.21-ubuntu-20.04.deb
+# Run within the docker container:
+# sudo apt update
+# sudo apt install ./coinhsl-2019.05.21-ubuntu-20.04.deb
+# Then you can switch to a faster solver through the following line:
+ik._ik.setLinearSolverName('ma27')
+
 # Add base pose target as a constraint
 ik.add_target(frame_name="data_Pelvis", target_type=TargetType.POSE, as_constraint=True)
 
@@ -175,9 +182,12 @@ else:
 
 if store_as_json:
 
-    outfile_name = os.path.join(script_directory, "retargeted_motion.txt")
+    # name the output file according to the input file
+    if mirroring:
+        outfile_name = os.path.join(script_directory, mocap_filename.split("/")[-2]+"_RETARGETED_MIRRORED.txt")
+    else:
+        outfile_name = os.path.join(script_directory, mocap_filename.split("/")[-2] + "_RETARGETED.txt")
 
-    input("Press Enter to store the retargeted mocap into a json file")
     utils.store_retargeted_mocap_as_json(timestamps=timestamps, ik_solutions=ik_solutions, outfile_name=outfile_name)
     print("\nThe retargeted mocap data have been saved in", outfile_name, "\n")
 
@@ -191,4 +201,4 @@ if visualize_retargeted_motion:
     utils.visualize_retargeted_motion(timestamps=timestamps, ik_solutions=ik_solutions, icub=icub,
                                       controlled_joints=controlled_joints, gazebo=gazebo)
 
-input("Close")
+    input("Close")
