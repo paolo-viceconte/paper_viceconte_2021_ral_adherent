@@ -176,8 +176,29 @@ for name, param in mann.named_parameters():
 # Check whether the gpu or the cpu is used
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
+input()
 
-# Define the loss function
+# Define weighted MSE loss
+# class WeightedMSELoss(nn.Module):
+#     def __init__(self, weights):
+#         super(WeightedMSELoss, self).__init__()
+#         self.weights = weights
+#     def forward(self, y_pred, y_true):
+#         squared_errors = torch.square(y_pred - y_true)
+#         weighted_squared_errors = squared_errors * self.weights.repeat(len(squared_errors),1)
+#         loss = torch.mean(weighted_squared_errors)
+#         return loss
+#
+# # Define weights to weight more the arm postural loss # TODO: hardcoded
+# weights_list = [1.0] * 91
+# for i in range(54,62):
+#     weights_list[i] = 3.0
+# weights = torch.tensor(weights_list)
+#
+# Use weighted MSE loss
+# loss_fn = WeightedMSELoss(weights=weights)
+
+# Use unweighted MSE loss
 loss_fn = nn.MSELoss(reduction="mean")
 
 # Initialize the optimizer
@@ -213,7 +234,7 @@ for epoch in range(epochs):
     mann.test_loop(loss_fn)
 
     # Save the trained model periodically and at the very last iteration
-    if epoch % 10 == 0 or epoch == epochs - 1:
+    if epoch > 0 and (epoch % 10 == 0 or epoch == epochs - 1):
         current_model_path = model_path + "/model_" + str(epoch) + ".pth"
         torch.save(mann, current_model_path)
         last_model_path = current_model_path
