@@ -385,7 +385,7 @@ class FeaturesExtractor:
         self.local_frame_features.compute_local_frame_features(global_frame_features=self.global_frame_features)
         self.local_window_features.compute_local_window_features(global_window_features=self.global_window_features)
 
-    def compute_X(self) -> List:
+    def compute_X(self, stop_frames: List = [], replicate_stop_frames: int = 0, skip_frames: List = []) -> List:
         """Generate the network input vector X."""
 
         window_length_frames = self.global_window_features.window_length_frames
@@ -394,7 +394,8 @@ class FeaturesExtractor:
         final_frame = len(self.global_frame_features.base_positions) - window_length_frames - window_step - 2
 
         # Initialize input vector
-        X = []
+        X_full = []
+        X_skipped = []
 
         # For each window of retargeted frames
         for i in range(initial_frame, final_frame):
@@ -428,15 +429,44 @@ class FeaturesExtractor:
             prev_s_dot = self.global_frame_features.s_dot[i - 2]
             X_i.extend(prev_s_dot)
 
-            # Store current input vector (137 components)
-            X.append(X_i)
+            # Store full current input vector (124 components)
+            X_full.append(X_i)
+
+            # Store current input vector (124 components) only if doesn't need to be skipped
+            to_skip = False
+            for skip_interval in skip_frames:
+                skip_start = skip_interval[0]
+                skip_end = skip_interval[1]
+                if 2*i in range(skip_start,skip_end):
+                    to_skip = True
+            if not to_skip:
+                X_skipped.append(X_i)
 
         # Debug
-        print("X size:", len(X), "x", len(X[0]))
+        print("X_full size before replicating stops:", len(X_full), "x", len(X_full[0]))
+        print("X_skipped size before replicating stops:", len(X_skipped), "x", len(X_skipped[0]))
 
-        return X
+        # For each stop frame to be replicated
+        for _ in range(replicate_stop_frames):
 
-    def compute_Y(self) -> List:
+            for stop_interval in stop_frames:
+
+                stop_start = stop_interval[0] - initial_frame
+                stop_end = stop_interval[1] - initial_frame
+
+                for i in range(round(stop_start/2) - 75, round(stop_end/2) - 25): # TODO hardcoded
+
+                    # Replicate current input vector (124 components)
+                    X_skipped.append(X_full[i])
+
+        # Debug
+        print("X_full size after replicating stops:", len(X_full), "x", len(X_full[0]))
+        print("X size after replicating steps:", len(X_skipped), "x", len(X_skipped[0]))
+
+        return X_skipped
+
+
+    def compute_Y(self, stop_frames: List = [], replicate_stop_frames: int = 0, skip_frames: List = []) -> List:
         """Generate the network output vector Y."""
 
         window_length_frames = self.global_window_features.window_length_frames
@@ -446,7 +476,8 @@ class FeaturesExtractor:
         final_frame = len(self.global_frame_features.base_positions) - window_length_frames - window_step - 2
 
         # Initialize output vector
-        Y = []
+        Y_full = []
+        Y_skipped = []
 
         # For each window of retargeted frames
         for i in range(initial_frame, final_frame):
@@ -497,13 +528,41 @@ class FeaturesExtractor:
             current_local_base_angular_velocity = [self.local_frame_features.base_angular_velocities[i - 1]]
             Y_i.extend(current_local_base_angular_velocity)
 
-            # Store current output vector (103 components)
-            Y.append(Y_i)
+            # Store current output vector (91 components)
+            Y_full.append(Y_i)
+
+            # Store current output vector (91 components) only if doesn't need to be skipped
+            to_skip = False
+            for skip_interval in skip_frames:
+                skip_start = skip_interval[0]
+                skip_end = skip_interval[1]
+                if 2*i in range(skip_start,skip_end):
+                    to_skip = True
+            if not to_skip:
+                Y_skipped.append(Y_i)
 
         # Debug
-        print("Y size:", len(Y), "x", len(Y[0]))
+        print("Y_full size before replicating stops:", len(Y_full), "x", len(Y_full[0]))
+        print("Y_skipped size before replicating stops:", len(Y_skipped), "x", len(Y_skipped[0]))
 
-        return Y
+        # For each stop frame to be replicated
+        for _ in range(replicate_stop_frames):
+
+            for stop_interval in stop_frames:
+
+                stop_start = stop_interval[0] - initial_frame
+                stop_end = stop_interval[1] - initial_frame
+
+                for i in range(round(stop_start/2) - 75, round(stop_end/2) - 25): # TODO hardcoded
+
+                    # Replicate current output vector (91 components)
+                    Y_skipped.append(Y_full[i])
+
+        # Debug
+        print("Y_full size after replicating stops:", len(Y_full), "x", len(Y_full[0]))
+        print("Y_skipped size after replicating stops:", len(Y_skipped), "x", len(Y_skipped[0]))
+
+        return Y_skipped
 
     def get_global_window_features(self) -> GlobalWindowFeatures:
         """Get the global features associated to a window of retargeted frames."""
