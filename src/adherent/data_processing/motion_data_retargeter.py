@@ -242,6 +242,64 @@ class IKTargets:
         self.link_orientation_targets["LeftUpperLeg"] = np.array(updated_orientations_left)
         self.link_orientation_targets["RightUpperLeg"] = np.array(updated_orientations_right)
 
+    def enforce_smaller_forward_steps(self) -> None:
+        """Limit the upper leg pitch difference to obtain smaller forward steps."""
+
+        print("Enforcing smaller forward steps")
+
+        updated_orientations_left = []
+        updated_orientations_right = []
+        pitch_difference = []
+
+        # Define threshold for the maximum difference between the left and the right pitches
+        pitch_difference_threshold = 0.15 # nominal steps reach 0.4
+
+        for i in range(len(self.link_orientation_targets["LeftUpperLeg"])):
+
+            # Retrieve original left target rpy
+            original_quaternions_left = self.link_orientation_targets["LeftUpperLeg"][i]
+            original_rotation_left = Rotation.from_quat(utils.to_xyzw(original_quaternions_left))
+            original_rpy_left = original_rotation_left.as_euler('xyz')
+
+            # Retrieve original right target rpy
+            original_quaternions_right = self.link_orientation_targets["RightUpperLeg"][i]
+            original_rotation_right = Rotation.from_quat(utils.to_xyzw(original_quaternions_right))
+            original_rpy_right = original_rotation_right.as_euler('xyz')
+
+            # Update left and right pitches if needed (based on the difference between the left and right pitches)
+            if original_rpy_left[1] - original_rpy_right[1] > pitch_difference_threshold:
+                delta = (original_rpy_left[1] - original_rpy_right[1]) - pitch_difference_threshold
+                original_rpy_left -= [0, delta/2.0, 0]
+                original_rpy_right += [0, delta/2.0, 0]
+            elif original_rpy_left[1] - original_rpy_right[1] < - pitch_difference_threshold:
+                delta = (original_rpy_left[1] - original_rpy_right[1]) + pitch_difference_threshold
+                original_rpy_left -= [0, delta/2.0, 0]
+                original_rpy_right += [0, delta/2.0, 0]
+
+            pitch_difference.append(original_rpy_left[1] - original_rpy_right[1])
+
+            # Retrieve update left target rpy
+            updated_rotation_left = Rotation.from_euler('xyz', original_rpy_left)
+            updated_quaternions_left = Quaternion.to_wxyz(updated_rotation_left.as_quat())
+            updated_orientations_left.append(updated_quaternions_left)
+            # updated_orientations_left.append(original_rpy_left[1])  # TODO remove, only for plotting
+
+            # Retrieve updated left target rpy
+            updated_rotation_right = Rotation.from_euler('xyz', original_rpy_right)
+            updated_quaternions_right = Quaternion.to_wxyz(updated_rotation_right.as_quat())
+            updated_orientations_right.append(updated_quaternions_right)
+            # updated_orientations_right.append(original_rpy_right[1])  # TODO remove, only for plotting
+
+        # # Temporary for debugging
+        # import matplotlib.pyplot as plt
+        # plt.plot(range(len(pitch_difference)),pitch_difference)
+        # plt.plot(range(len(updated_orientations_left)),updated_orientations_left)
+        # plt.plot(range(len(updated_orientations_right)),updated_orientations_right)
+        # plt.show()
+
+        # Store updated targets
+        self.link_orientation_targets["LeftUpperLeg"] = np.array(updated_orientations_left)
+        self.link_orientation_targets["RightUpperLeg"] = np.array(updated_orientations_right)
 
 @dataclass
 class WBGR:
@@ -259,6 +317,7 @@ class WBGR:
               horizontal_feet: bool = False,
               straight_head: bool = False,
               wider_legs: bool = False,
+              smaller_forward_steps: bool = False,
               robot_to_target_base_quat: List = None) -> "WBGR":
         """Build an instance of WBGR."""
 
@@ -280,6 +339,10 @@ class WBGR:
         if wider_legs:
             # Enforce wider legs
             ik_targets.enforce_wider_legs()
+
+        if smaller_forward_steps:
+            # Enforce smaller forward steps
+            ik_targets.enforce_smaller_forward_steps()
 
         return WBGR(ik_targets=ik_targets, ik=ik, robot_to_target_base_quat=robot_to_target_base_quat)
 
@@ -520,6 +583,7 @@ class KFWBGR(WBGR):
               horizontal_feet: bool = False,
               straight_head: bool = False,
               wider_legs: bool = False,
+              smaller_forward_steps: bool = False,
               robot_to_target_base_quat: List = None,
               kindyn: kindyncomputations.KinDynComputations = None,
               local_foot_vertices_pos: List = None,
@@ -544,6 +608,10 @@ class KFWBGR(WBGR):
         if wider_legs:
             # Enforce wider legs
             ik_targets.enforce_wider_legs()
+
+        if smaller_forward_steps:
+            # Enforce smaller forward steps
+            ik_targets.enforce_smaller_forward_steps()
 
         kinematic_computations = KinematicComputations.build(
             kindyn=kindyn, local_foot_vertices_pos=local_foot_vertices_pos, feet_frames=feet_frames)

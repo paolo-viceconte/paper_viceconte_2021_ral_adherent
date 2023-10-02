@@ -32,6 +32,7 @@ parser.add_argument("--deactivate_horizontal_feet", help="Deactivate horizontal 
 parser.add_argument("--deactivate_straight_head", help="Deactivate straight head enforcing.", action="store_true")
 parser.add_argument("--deactivate_wider_legs", help="Deactivate wider legs enforcing.", action="store_true")
 parser.add_argument("--deactivate_visualization", help="Do not visualize the retargeted motion.", action="store_true")
+parser.add_argument("--smaller_forward_steps", help="Obtain smaller frontal steps.", action="store_true")
 
 args = parser.parse_args()
 
@@ -42,6 +43,7 @@ store_as_json = args.save
 horizontal_feet = not args.deactivate_horizontal_feet
 straight_head = not args.deactivate_straight_head
 wider_legs = not args.deactivate_wider_legs
+smaller_forward_steps = args.smaller_forward_steps
 visualize_retargeted_motion = not args.deactivate_visualization
 
 # =====================
@@ -156,6 +158,7 @@ if kinematically_feasible_base_retargeting:
                                                      horizontal_feet=horizontal_feet,
                                                      straight_head=straight_head,
                                                      wider_legs=wider_legs,
+                                                     smaller_forward_steps=smaller_forward_steps,
                                                      robot_to_target_base_quat=robot_to_target_base_quat,
                                                      kindyn=kindyn,
                                                      local_foot_vertices_pos=local_foot_vertices_pos,
@@ -168,6 +171,7 @@ else:
                                                    horizontal_feet=horizontal_feet,
                                                    straight_head=straight_head,
                                                    wider_legs=wider_legs,
+                                                   smaller_forward_steps=smaller_forward_steps,
                                                    robot_to_target_base_quat=robot_to_target_base_quat)
 
 # Retrieve ik solutions
