@@ -303,7 +303,7 @@ def visualize_retargeted_motion(timestamps: List,
 def visualize_global_features(global_window_features,
                               ik_solutions: List,
                               icub: iCub,
-                              controlled_joints: List,
+                              controlled_joints_indexes: List,
                               gazebo: scenario.GazeboSimulator,
                               plot_facing_directions: bool = True,
                               plot_base_velocities: bool = False) -> None:
@@ -330,9 +330,15 @@ def visualize_global_features(global_window_features,
         base_position = np.asarray(ik_solution["base_position"])
         base_quaternion = np.asarray(ik_solution["base_quaternion"])
 
+        # Use zeros for the joints that are not considered in the features
+        icub_joints = icub.joint_names()
+        full_joint_positions = np.zeros(len(joint_positions))
+        for index in controlled_joints_indexes:
+            full_joint_positions[index] = joint_positions[index]
+
         # Reset the base pose and the joint positions
         icub.to_gazebo().reset_base_pose(base_position, base_quaternion)
-        icub.to_gazebo().reset_joint_positions(joint_positions, controlled_joints)
+        icub.to_gazebo().reset_joint_positions(full_joint_positions, icub_joints)
         gazebo.run(paused=True)
 
         # Retrieve global features
@@ -427,7 +433,7 @@ def visualize_global_features(global_window_features,
 def visualize_local_features(local_window_features,
                              ik_solutions: List,
                              icub: iCub,
-                             controlled_joints: List,
+                             controlled_joints_indexes: List,
                              gazebo: scenario.GazeboSimulator,
                              plot_facing_directions: bool = True,
                              plot_base_velocities: bool = False) -> None:
@@ -454,9 +460,15 @@ def visualize_local_features(local_window_features,
         base_position = np.asarray(ik_solution["base_position"])
         base_quaternion = np.asarray(ik_solution["base_quaternion"])
 
+        # Use zeros for the joints that are not considered in the features
+        icub_joints = icub.joint_names()
+        full_joint_positions = np.zeros(len(joint_positions))
+        for index in controlled_joints_indexes:
+            full_joint_positions[index] = joint_positions[index]
+
         # Reset the base pose and the joint positions
         icub.to_gazebo().reset_base_pose(base_position, base_quaternion)
-        icub.to_gazebo().reset_joint_positions(joint_positions, controlled_joints)
+        icub.to_gazebo().reset_joint_positions(full_joint_positions, icub_joints)
         gazebo.run(paused=True)
 
         # Retrieve local features
