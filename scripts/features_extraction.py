@@ -99,8 +99,8 @@ controlled_joints = ['l_hip_pitch', 'l_hip_roll', 'l_hip_yaw', 'l_knee', 'l_ankl
                      'r_hip_pitch', 'r_hip_roll', 'r_hip_yaw', 'r_knee', 'r_ankle_pitch', 'r_ankle_roll',  # right leg
                      'torso_pitch', 'torso_roll', 'torso_yaw',  # torso
                      'neck_pitch', 'neck_roll', 'neck_yaw', # neck
-                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', 'l_wrist_yaw', 'l_wrist_roll', 'l_wrist_pitch', # left arm
-                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow', 'r_wrist_yaw', 'r_wrist_roll', 'r_wrist_pitch'] # right arm
+                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', # left arm
+                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow'] # right arm
 controlled_joints_indexes = [icub_joints.index(elem) for elem in controlled_joints]
 # controlled_joints_retrieved = [icub_joints[index] for index in controlled_joints_indexes] # This is how to use the indexes
 
@@ -185,7 +185,7 @@ if plot_global:
     utils.visualize_global_features(global_window_features=extractor.get_global_window_features(),
                                     ik_solutions=ik_solutions,
                                     icub=icub,
-                                    controlled_joints=controlled_joints,
+                                    controlled_joints_indexes=controlled_joints_indexes,
                                     gazebo=gazebo)
 
 # =======================================================
@@ -198,5 +198,5 @@ if plot_local:
     utils.visualize_local_features(local_window_features=extractor.get_local_window_features(),
                                    ik_solutions=ik_solutions,
                                    icub=icub,
-                                   controlled_joints=controlled_joints,
+                                   controlled_joints_indexes=controlled_joints_indexes,
                                    gazebo=gazebo)

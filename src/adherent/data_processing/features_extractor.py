@@ -420,11 +420,11 @@ class FeaturesExtractor:
                 current_local_base_velocities.extend(local_base_velocity)
             X_i.extend(current_local_base_velocities)
 
-            # Add previous joint positions (32 components)
+            # Add previous joint positions (26 components)
             prev_s = self.global_frame_features.s[i - 1]
             X_i.extend(prev_s)
 
-            # Add previous joint velocities (32 components)
+            # Add previous joint velocities (26 components)
             prev_s_dot = self.global_frame_features.s_dot[i - 2]
             X_i.extend(prev_s_dot)
 
@@ -475,18 +475,20 @@ class FeaturesExtractor:
                     next_local_base_velocities.extend(self.local_window_features.base_velocities[i - window_length_frames + 1][j])
             Y_i.extend(next_local_base_velocities)
 
-            # Add current joint positions (32 components)
+            # Add current joint positions (26 components)
             current_s = self.global_frame_features.s[i]
             Y_i.extend(current_s)
 
-            # Add current joint velocities (32 components)
+            # Add current joint velocities (26 components)
             current_s_dot = self.global_frame_features.s_dot[i - 1]
             Y_i.extend(current_s_dot)
 
+            # TODO: remove unused value
             # Add current local base x linear velocity component (1 component)
             current_local_base_x_velocity = [self.local_frame_features.base_x_velocities[i - 1]]
             Y_i.extend(current_local_base_x_velocity)
 
+            # TODO: remove unused value
             # Add current local base y linear velocity component (1 component)
             current_local_base_z_velocity = [self.local_frame_features.base_z_velocities[i - 1]]
             Y_i.extend(current_local_base_z_velocity)
