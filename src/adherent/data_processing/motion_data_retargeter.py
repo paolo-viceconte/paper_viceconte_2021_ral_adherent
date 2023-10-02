@@ -350,6 +350,23 @@ class WBGR:
                 continue
 
             ik_solution = self.ik.get_full_solution()
+
+            # ====================================
+            # IMPOSE LIMITS FOR THE SHOULDER ROLLS
+            # ====================================
+
+            # Define shoulder roll lower limit # TODO: move in the utils since this is robot-dependent
+            shoulder_roll_lower_limit = 0.1
+
+            # Impose left shoulder roll lower limit
+            if ik_solution.joint_configuration[self.ik._joint_serialization.index('l_shoulder_roll')] < shoulder_roll_lower_limit:
+                ik_solution.joint_configuration[self.ik._joint_serialization.index('l_shoulder_roll')] = shoulder_roll_lower_limit
+
+            # Impose right shoulder roll lower limit
+            if ik_solution.joint_configuration[self.ik._joint_serialization.index('r_shoulder_roll')] < shoulder_roll_lower_limit:
+                ik_solution.joint_configuration[self.ik._joint_serialization.index('r_shoulder_roll')] = shoulder_roll_lower_limit
+
+            # Store the ik solutions
             ik_solutions.append(ik_solution)
 
         print("Jumped", jumped_frames, "frames due to IK failures")
