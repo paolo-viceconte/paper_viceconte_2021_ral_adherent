@@ -28,19 +28,22 @@ def get_dataset_portions(dataset: str) -> Dict:
     """Retrieve the portions associated to each dataset."""
 
     if dataset == "D2":
-        portions = {1: "1_forward_normal_step",
-                    2: "2_backward_normal_step",
-                    3: "3_left_and_right_normal_step",
-                    4: "4_diagonal_normal_step",
-                    5: "5_mixed_normal_step"}
+        portions = {
+            1: "1_forward_normal_step",
+            2: "2_backward_normal_step",
+            # 3: "3_left_and_right_normal_step",
+            # 4: "4_diagonal_normal_step",
+            # 5: "5_mixed_normal_step",
+        }
     elif dataset == "D3":
-        portions = {6: "6_forward_small_step",
-                    7: "7_backward_small_step",
-                    8: "8_left_and_right_small_step",
-                    9: "9_diagonal_small_step",
-                    10: "10_mixed_small_step",
-                    11: "11_mixed_normal_and_small_step"}
-
+        portions = {
+            # 6: "6_forward_small_step",
+            # 7: "7_backward_small_step",
+            8: "8_left_and_right_small_step",
+            # 9: "9_diagonal_small_step",
+            # 10: "10_mixed_small_step",
+            11: "11_mixed_normal_and_small_step",
+        }
     else:
         raise Exception("Dataset portions only defined for datasets D2 and D3.")
 
