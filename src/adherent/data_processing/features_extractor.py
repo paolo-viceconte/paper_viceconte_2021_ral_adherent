@@ -169,7 +169,6 @@ class GlobalWindowFeatures:
         for i in range(initial_frame, final_frame):
 
             # Initialize placeholders for the current window
-            future_traj_length = 0
             current_global_base_positions = []
             current_global_facing_directions = []
             current_global_base_velocities = []
@@ -181,17 +180,7 @@ class GlobalWindowFeatures:
                 current_global_facing_directions.append(global_frame_features.facing_directions[i + window_index])
                 current_global_base_velocities.append(global_frame_features.base_velocities[i + window_index])
 
-                # Compute the desired velocity as sum of distances between the base positions in the future trajectory
-                if window_index == self.window_indexes[0]:
-                    base_position_prev = global_frame_features.base_positions[i + window_index]
-                else:
-                    base_position = global_frame_features.base_positions[i + window_index]
-                    base_position_distance = np.linalg.norm(base_position - base_position_prev)
-                    future_traj_length += base_position_distance
-                    base_position_prev = base_position
-
             # Store global features for the current window
-            self.desired_velocities.append(future_traj_length)
             self.base_positions.append(current_global_base_positions)
             self.facing_directions.append(current_global_facing_directions)
             self.base_velocities.append(current_global_base_velocities)
@@ -430,10 +419,6 @@ class FeaturesExtractor:
             for local_base_velocity in self.local_window_features.base_velocities[i - window_length_frames]:
                 current_local_base_velocities.extend(local_base_velocity)
             X_i.extend(current_local_base_velocities)
-
-            # Add current desired velocity (1 component)
-            current_desired_velocity = [self.global_window_features.desired_velocities[i - window_length_frames]]
-            X_i.extend(current_desired_velocity)
 
             # Add previous joint positions (32 components)
             prev_s = self.global_frame_features.s[i - 1]
