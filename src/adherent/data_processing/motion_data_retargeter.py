@@ -194,29 +194,53 @@ class IKTargets:
     def enforce_wider_legs(self) -> None:
         """Enforce offsets to the upper leg target orientations so to avoid feet crossing."""
 
-        for link in ["LeftUpperLeg", "RightUpperLeg"]:
+        print("Enforcing wider legs")
 
-            print("Enforcing wider", link)
+        updated_orientations_left = []
+        updated_orientations_right = []
+        roll_difference = []
 
-            updated_orientations = []
+        # Define threshold for the minimum difference between the left and the right rolls
+        roll_difference_threshold = 0.1
 
-            for i in range(len(self.link_orientation_targets[link])):
+        for i in range(len(self.link_orientation_targets["LeftUpperLeg"])):
 
-                # Retrieve original target rpy
-                original_quaternions = self.link_orientation_targets[link][i]
-                original_rotation = Rotation.from_quat(utils.to_xyzw(original_quaternions))
-                original_rpy = original_rotation.as_euler('xyz')
+            # Retrieve original left target rpy
+            original_quaternions_left = self.link_orientation_targets["LeftUpperLeg"][i]
+            original_rotation_left = Rotation.from_quat(utils.to_xyzw(original_quaternions_left))
+            original_rpy_left = original_rotation_left.as_euler('xyz')
 
-                # Enforce RPY offsets # TODO
-                if link == "LeftUpperLeg":
-                    original_rpy += [0.1, 0, 0]
-                elif link == "RightUpperLeg":
-                    original_rpy -= [0.1, 0, 0]
-                updated_rotation = Rotation.from_euler('xyz', original_rpy)
-                updated_quaternions = Quaternion.to_wxyz(updated_rotation.as_quat())
-                updated_orientations.append(updated_quaternions)
+            # Retrieve original right target rpy
+            original_quaternions_right = self.link_orientation_targets["RightUpperLeg"][i]
+            original_rotation_right = Rotation.from_quat(utils.to_xyzw(original_quaternions_right))
+            original_rpy_right = original_rotation_right.as_euler('xyz')
 
-            self.link_orientation_targets[link] = np.array(updated_orientations)
+            # Update left and right rolls if needed (based on the difference between the left and right rolls)
+            if original_rpy_left[0] - original_rpy_right[0] < roll_difference_threshold:
+                delta = roll_difference_threshold - (original_rpy_left[0] - original_rpy_right[0])
+                original_rpy_left += [delta/2.0, 0, 0]
+                original_rpy_right -= [delta/2.0, 0, 0]
+
+            # Retrieve update left target rpy
+            updated_rotation_left = Rotation.from_euler('xyz', original_rpy_left)
+            updated_quaternions_left = Quaternion.to_wxyz(updated_rotation_left.as_quat())
+            updated_orientations_left.append(updated_quaternions_left)
+
+            # Retrieve updated left target rpy
+            updated_rotation_right = Rotation.from_euler('xyz', original_rpy_right)
+            updated_quaternions_right = Quaternion.to_wxyz(updated_rotation_right.as_quat())
+            updated_orientations_right.append(updated_quaternions_right)
+
+        # Temporary for debugging
+        # import matplotlib.pyplot as plt
+        # plt.plot(range(len(roll_difference)),roll_difference)
+        # plt.plot(range(len(updated_orientations_left)),updated_orientations_left)
+        # plt.plot(range(len(updated_orientations_right)),updated_orientations_right)
+        # plt.show()
+
+        # Store updated targets
+        self.link_orientation_targets["LeftUpperLeg"] = np.array(updated_orientations_left)
+        self.link_orientation_targets["RightUpperLeg"] = np.array(updated_orientations_right)
 
 
 @dataclass
