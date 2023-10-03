@@ -6,7 +6,6 @@
 
 import os
 import yarp
-import time
 import argparse
 
 # TODO: remove (but protobuf error)
@@ -29,16 +28,10 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--training_path", help="Path where the training-related data are stored. Relative path from script folder.",
                     type = str, default = "../datasets/training_subsampled_mirrored_D2_D3_20230910-130015_paper_experiments/")
-
 parser.add_argument("--storage_path", help="Path where the generated trajectory will be stored. Relative path from script folder.",
                     type=str, default="../datasets/inference/")
 parser.add_argument("--save_every_N_iterations", help="Data will be saved every N iterations.",
                     type=int, default=1000)
-parser.add_argument("--stream_every_N_steps", help="Data will be streamed every N steps.",
-                    type=int, default=10000)
-parser.add_argument("--stream_every_N_iterations", help="If no steps are performed, data will be streamed every N iterations.",
-                    type=int, default=10000)
-parser.add_argument("--plot_footsteps", help="Visualize the footsteps.", action="store_true")
 parser.add_argument("--time_scaling", help="Time scaling to be applied to the generated trajectory. Keep it integer.",
                     type=int, default=1)
 
@@ -46,9 +39,6 @@ args = parser.parse_args()
 storage_path = args.storage_path
 save_every_N_iterations = args.save_every_N_iterations
 training_path = args.training_path
-stream_every_N_iterations = args.stream_every_N_iterations
-stream_every_N_steps = args.stream_every_N_steps
-plot_footsteps = args.plot_footsteps
 time_scaling = args.time_scaling
 
 # ==================
@@ -188,27 +178,6 @@ while True:
         generator.autoregression.update_mergepoint_state()
         generator.kincomputations.update_mergepoint_state()
 
-        # Plot the initial footsteps
-        if plot_footsteps:
-            for foot in generator.storage.footsteps:
-                generator.plotter.plot_new_footstep(support_foot=foot,
-                                                    new_footstep=generator.storage.footsteps[foot][-1])
-
-    # Stream data every N steps (or if the maximum number of iterations without steps is reached)
-    if generator.get_n_steps() == stream_every_N_steps or generator.get_n_iterations() == stream_every_N_iterations:
-
-        # TODO: also handle missing deactivation times at the beginning ?
-        generator.preprocess_data()
-
-        # TODO: Stream data (now this is just printing)
-        generator.stream_data()
-
-        # Reset to the last mergepoint
-        generator.reset_from_mergepoint()
-
-        # Debug
-        input("Press Enter to proceed.")
-
     # Update the iteration counter
     generator.update_iteration_counter()
 
@@ -228,13 +197,6 @@ while True:
 
     # Update the support foot and vertex while detecting new footsteps
     support_foot, update_footsteps_list = generator.update_support_vertex_and_support_foot_and_footsteps()
-
-    # Plot the new footstep
-    if update_footsteps_list and plot_footsteps:
-
-        # Plot the last footstep
-        generator.plotter.plot_new_footstep(support_foot=support_foot,
-                                            new_footstep=generator.storage.footsteps[support_foot][-1])
 
     # Compute kinematically-feasible base position and updated posturals
     new_base_postural, new_joints_pos_postural, new_joints_vel_postural, \

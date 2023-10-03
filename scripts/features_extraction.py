@@ -182,8 +182,6 @@ if store_as_json:
         input_path = "../datasets/IO_features/inputs_subsampled_mirrored_" + dataset + "/" + retargeted_mocaps[retargeted_mocap_index] + "_X_MIRRORED.txt"
     input_path = os.path.join(script_directory, input_path)
 
-    # input("Press Enter to store the computed X")
-
     # Store the retrieved input X in a JSON file
     with open(input_path, 'w') as outfile:
         json.dump(X, outfile)
@@ -210,8 +208,6 @@ if store_as_json:
     else:
         output_path = "../datasets/IO_features/outputs_subsampled_mirrored_" + dataset + "/" + retargeted_mocaps[retargeted_mocap_index] + "_Y_MIRRORED.txt"
     output_path = os.path.join(script_directory, output_path)
-
-    # input("Press Enter to store the computed Y")
 
     # Store the retrieved output Y in a JSON file
     with open(output_path, 'w') as outfile:

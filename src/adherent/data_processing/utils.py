@@ -45,46 +45,26 @@ class iCub(core.Model):
 def define_robot_to_target_base_quat(robot: str) -> List:
     """Define the robot-specific quaternions from the robot base frame to the target base frame."""
 
-    if robot == "iCubV2_5":
-        # For iCubV2_5, the robot base frame is rotated of -180 degs on z w.r.t. the target base frame
-        robot_to_target_base_quat = [0, 0, 0, -1.0]
-
-    elif robot == "iCubV3":
-        # For iCubV3, the robot base frame is the same as the target base frame
-        robot_to_target_base_quat = [0, 0, 0, 0.0]
-
-    elif robot == "ergoCubV1":
+    if robot == "ergoCubV1":
         # For ergoCubV1, the robot base frame is the same as the target base frame
         robot_to_target_base_quat = [0, 0, 0, 0.0]
 
     else:
-        raise Exception("Quaternions from the robot to the target base frame only defined for iCubV2_5, iCubV3 and ergoCubV1.")
+        raise Exception("Quaternions from the robot to the target base frame only defined for ergoCubV1.")
 
     return robot_to_target_base_quat
 
 def define_feet_frames_and_links(robot: str) -> Dict:
     """Define the robot-specific feet frames and links."""
 
-    if robot == "iCubV2_5":
-        right_foot_frame = "r_foot"
-        left_foot_frame = "l_foot"
-        right_foot_link = "r_ankle_2"
-        left_foot_link = "l_ankle_2"
-
-    elif robot == "iCubV3":
-        right_foot_frame = "r_sole"
-        left_foot_frame = "l_sole"
-        right_foot_link = "r_ankle_2"
-        left_foot_link = "l_ankle_2"
-
-    elif robot == "ergoCubV1":
+    if robot == "ergoCubV1":
         right_foot_frame = "r_sole"
         left_foot_frame = "l_sole"
         right_foot_link = "r_ankle_2"
         left_foot_link = "l_ankle_2"
 
     else:
-        raise Exception("Feet frames and links only defined for iCubV2_5, iCubV3 and ergoCubV1.")
+        raise Exception("Feet frames and links only defined for ergoCubV1.")
 
     feet_frames = {"right_foot": right_foot_frame, "left_foot": left_foot_frame}
     feet_links = {feet_frames["right_foot"]: right_foot_link, feet_frames["left_foot"]: left_foot_link}
@@ -94,26 +74,9 @@ def define_feet_frames_and_links(robot: str) -> Dict:
 def define_foot_vertices(robot: str) -> List:
     """Define the robot-specific positions of the feet vertices in the foot frame."""
 
-    if robot == "iCubV2_5":
+    if robot == "ergoCubV1":
 
-        # For iCubV2_5, the feet vertices are not symmetrically placed wrt the foot frame origin.
-        # The foot frame has z pointing down, x pointing forward and y pointing right.
-
-        # Origin of the box which represents the foot (in the foot frame)
-        box_origin = [0.03, 0.005, 0.014]
-
-        # Size of the box which represents the foot
-        box_size = [0.16, 0.072, 0.001]
-
-        # Define front-left (FL), front-right (FR), back-left (BL) and back-right (BR) vertices in the foot frame
-        FL_vertex_pos = [box_origin[0] + box_size[0]/2, box_origin[1] - box_size[1]/2, box_origin[2]]
-        FR_vertex_pos = [box_origin[0] + box_size[0]/2, box_origin[1] + box_size[1]/2, box_origin[2]]
-        BL_vertex_pos = [box_origin[0] - box_size[0]/2, box_origin[1] - box_size[1]/2, box_origin[2]]
-        BR_vertex_pos = [box_origin[0] - box_size[0]/2, box_origin[1] + box_size[1]/2, box_origin[2]]
-
-    elif robot == "iCubV3":
-
-        # For iCubV3, the feet vertices are symmetrically placed wrt the sole frame origin.
+        # For ergoCubV1, the feet vertices are symmetrically placed wrt the sole frame origin.
         # The sole frame has z pointing up, x pointing forward and y pointing left.
 
         # Size of the box which represents the foot rear
@@ -128,25 +91,8 @@ def define_foot_vertices(robot: str) -> List:
         BL_vertex_pos = [- box_size[0] - boxes_distance / 2, box_size[1] / 2, 0]
         BR_vertex_pos = [- box_size[0] - boxes_distance / 2, - box_size[1] / 2, 0]
 
-    elif robot == "ergoCubV1":
-
-        # For ergoCubV1, the feet vertices are symmetrically placed wrt the sole frame origin.
-        # The sole frame has z pointing up, x pointing forward and y pointing left.
-
-        # Size of the box which represents the foot rear
-        box_size = [0.117, 0.1, 0.006]
-
-        # Distance between the foot rear and the foot front boxes # TODO: doublecheck
-        boxes_distance = 0.00225
-
-        # Define front-left (FL), front-right (FR), back-left (BL) and back-right (BR) vertices in the foot frame
-        FL_vertex_pos = [box_size[0] + boxes_distance / 2, box_size[1] / 2, 0]
-        FR_vertex_pos = [box_size[0] + boxes_distance / 2, - box_size[1] / 2, 0]
-        BL_vertex_pos = [- box_size[0] - boxes_distance / 2, box_size[1] / 2, 0]
-        BR_vertex_pos = [- box_size[0] - boxes_distance / 2, - box_size[1] / 2, 0]
-
     else:
-        raise Exception("Feet vertices positions only defined for iCubV2_5, iCubV3 and ergoCubV1.")
+        raise Exception("Feet vertices positions only defined for ergoCubV1.")
 
     # Vertices positions in the foot (F) frame
     F_vertices_pos = [FL_vertex_pos, FR_vertex_pos, BL_vertex_pos, BR_vertex_pos]
@@ -213,40 +159,24 @@ def load_retargeted_mocap_from_json(input_file_name: str, initial_frame: int = 0
 def define_frontal_base_direction(robot: str) -> List:
     """Define the robot-specific frontal base direction in the base frame."""
 
-    if robot == "iCubV2_5":
-        # For iCubV2_5, the reversed x axis of the base frame is pointing forward
-        frontal_base_direction = [-1, 0, 0]
-
-    elif robot == "iCubV3":
-        # For iCubV3, the x axis is pointing forward
-        frontal_base_direction = [1, 0, 0]
-
-    elif robot == "ergoCubV1":
+    if robot == "ergoCubV1":
         # For ergoCubV1, the x axis is pointing forward
         frontal_base_direction = [1, 0, 0]
 
     else:
-        raise Exception("Frontal base direction only defined for iCubV2_5, iCubV3 and ergoCubV1.")
+        raise Exception("Frontal base direction only defined for ergoCubV1.")
 
     return frontal_base_direction
 
 def define_frontal_chest_direction(robot: str) -> List:
     """Define the robot-specific frontal chest direction in the chest frame."""
 
-    if robot == "iCubV2_5":
-        # For iCubV2_5, the z axis of the chest frame is pointing forward
-        frontal_chest_direction = [0, 0, 1]
-
-    elif robot == "iCubV3":
-        # For iCubV3, the x axis of the chest frame is pointing forward
-        frontal_chest_direction = [1, 0, 0]
-
-    elif robot == "ergoCubV1":
+    if robot == "ergoCubV1":
         # For ergoCubV1, the x axis of the chest frame is pointing forward
         frontal_chest_direction = [1, 0, 0]
 
     else:
-        raise Exception("Frontal chest direction only defined for iCubV2_5, iCubV3 and ergoCubV1.")
+        raise Exception("Frontal chest direction only defined for ergoCubV1.")
 
     return frontal_chest_direction
 

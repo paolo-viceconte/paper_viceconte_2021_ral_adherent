@@ -7,6 +7,7 @@ import json
 import numpy as np
 from scenario import core
 from typing import List, Dict
+import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from scenario import gazebo as scenario
 
@@ -126,8 +127,6 @@ def load_component_wise_input_mean_and_std(datapath: str) -> (Dict, Dict):
     Xstd_dict["past_base_velocities"] = Xstd[48:60]
     Xmean_dict["future_base_velocities"] = Xmean[60:72]
     Xstd_dict["future_base_velocities"] = Xstd[60:72]
-    # Xmean_dict["future_traj_length"] = Xmean[72]
-    # Xstd_dict["future_traj_length"] = Xstd[72]
     Xmean_dict["s"] = Xmean[72:98]
     Xstd_dict["s"] = Xstd[72:98]
     Xmean_dict["s_dot"] = Xmean[98:]
@@ -566,11 +565,8 @@ def visualize_generated_motion(icub: iCub,
                                r_footsteps: Dict,
                                posturals: Dict,
                                raw_data: List,
-                               blending_coeffs: Dict,
-                               plot_blending_coeffs: bool = False,
                                plot_joystick_inputs: bool = False,
-                               plot_com: bool = False,
-                               plot_momentum: bool = False) -> None:
+                               plot_com: bool = False) -> None:
     """Visualize the generated motion, optionally along with the joystick inputs used to generate it, the activations
     of the blending coefficients, the com and the momentum evolution during the trajectory generation."""
 
@@ -584,15 +580,6 @@ def visualize_generated_motion(icub: iCub,
 
     # Define controlled joints
     icub_joints = icub.joint_names()
-
-    # Config before any plot
-    import matplotlib as mpl
-    mpl.use('Qt5Agg')
-    mpl.rcParams['toolbar'] = 'None'
-    import matplotlib.pyplot as plt
-    plt.rcParams.update({'font.size': 25})
-
-    print("Matplotlib backend:", mpl.get_backend())
 
     # Plot configuration
     plt.ion()
