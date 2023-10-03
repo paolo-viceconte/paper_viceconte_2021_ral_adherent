@@ -24,6 +24,12 @@ import matplotlib.pyplot as plt
 class StorageHandler:
     """Class to store the quantities relevant in the trajectory generation pipeline."""
 
+    # Storage paths for the footsteps, postural, joystick input and blending coefficients
+    footsteps_path: str
+    postural_path: str
+    joystick_input_path: str
+    blending_coefficients_path: str
+
     # Time scaling factor for the trajectory
     time_scaling: int
     generation_to_control_time_scaling: int
@@ -41,13 +47,27 @@ class StorageHandler:
     mergepoint_footsteps: Dict = field(default_factory=lambda: {})
     # mergepoint_posturals: Dict = field(default_factory=lambda: {}) # TODO
 
+    # Storage dictionaries for footsteps, postural, joystick input and blending coefficients
+    footsteps: Dict
+    posturals: Dict = field(default_factory=lambda: {'base': [], 'joints_pos': [], 'joints_vel': [], 'links': [], 'com_pos': [], 'com_vel': [], 'centroidal_momentum': []})
+    joystick_inputs: Dict = field(default_factory=lambda: {'raw_data': [], 'base_velocities': [], 'base_angular_velocities': []})
+    blending_coeffs: Dict = field(default_factory=lambda: {'w_1': [], 'w_2': [], 'w_3': [], 'w_4': []})
+
+
     @staticmethod
-    def build(feet_frames: Dict,
+    def build(storage_path: str,
+              feet_frames: Dict,
               initial_l_foot_position: List,
               initial_r_foot_position: List,
               generation_to_control_time_scaling: int,
               time_scaling: int = 1) -> "StorageHandler":
         """Build an instance of StorageHandler."""
+
+        # Storage paths for the footsteps, postural, joystick input and blending coefficients
+        footsteps_path = os.path.join(storage_path, "footsteps.txt")
+        postural_path = os.path.join(storage_path, "postural.txt")
+        joystick_input_path = os.path.join(storage_path, "joystick_input.txt")
+        blending_coefficients_path = os.path.join(storage_path, "blending_coefficients.txt")
 
         # Define initial left footstep
         initial_left_footstep = {}
@@ -66,12 +86,29 @@ class StorageHandler:
         # Initialize footsteps with initial left and right footsteps
         footsteps = {feet_frames["left_foot"]: [initial_left_footstep], feet_frames["right_foot"]: [initial_right_footstep]}
 
-        return StorageHandler(feet_frames=feet_frames,
+        return StorageHandler(footsteps_path,
+                              postural_path,
+                              joystick_input_path,
+                              blending_coefficients_path,
+                              feet_frames=feet_frames,
                               initial_l_foot_position=initial_l_foot_position,
                               initial_r_foot_position=initial_r_foot_position,
                               footsteps=footsteps,
                               generation_to_control_time_scaling=generation_to_control_time_scaling,
                               time_scaling=time_scaling)
+
+    def update_joystick_inputs_storage(self, raw_data: List, base_velocities: List) -> None:
+        """Update the storage of the joystick inputs."""
+
+        # Replicate the joystick inputs at the desired frequency
+        for _ in range(self.generation_to_control_time_scaling * self.time_scaling):
+            self.joystick_inputs["raw_data"].append(raw_data)
+            self.joystick_inputs["base_velocities"].append(base_velocities)
+
+    def replace_footsteps_storage(self, footsteps: Dict) -> None:
+        """Replace the storage of footsteps with an updated footsteps list."""
+
+        self.footsteps = footsteps
 
     def update_footsteps_storage(self, support_foot: str, footstep: Dict) -> None:
         """Add a footstep to the footsteps storage."""
@@ -254,6 +291,29 @@ class StorageHandler:
         for key in self.posturals.keys():
             self.posturals[key] = []
 
+    def save_data_as_json(self) -> None:
+        """Save all the stored data using the json format."""
+
+        # Save footsteps
+        with open(self.footsteps_path, 'w') as outfile:
+            json.dump(self.footsteps, outfile)
+
+        # Save postural
+        with open(self.postural_path, 'w') as outfile:
+            json.dump(self.posturals, outfile)
+
+        # Save joystick inputs
+        with open(self.joystick_input_path, 'w') as outfile:
+            json.dump(self.joystick_inputs, outfile)
+
+        # Save blending coefficients
+        with open(self.blending_coefficients_path, 'w') as outfile:
+            json.dump(self.blending_coeffs, outfile)
+
+        # Debug
+        input("\nData have been saved. Press Enter to continue the trajectory generation.")
+
+
 
 @dataclass
 class FootstepsExtractor:
@@ -347,6 +407,21 @@ class FootstepsExtractor:
         self.waiting_for_deactivation_time = True
 
         return new_footstep
+
+    def update_footsteps(self, final_deactivation_time: float, footsteps: Dict) -> Dict:
+        """Update the footsteps list before saving data by replacing temporary deactivation times (if any) and
+        merging footsteps which are too close each other in order to avoid unintended footsteps on the spot.
+        """
+
+        # Update the deactivation time of the last footstep of each foot (they need to coincide to be processed
+        # properly in the trajectory control layer)
+        for foot in footsteps.keys():
+            footsteps[foot][-1]["deactivation_time"] = final_deactivation_time
+        # Replace temporary deactivation times in the footsteps list (if any)
+        updated_footsteps = self.replace_temporary_deactivation_times(footsteps=footsteps)
+
+        return updated_footsteps
+
 
     # TODO: remove (and do it online if needed)
     def replace_temporary_deactivation_times(self, footsteps: Dict) -> Dict:
@@ -1400,6 +1475,7 @@ class TrajectoryGenerator:
               gazebo: scenario.GazeboSimulator,
               kindyn: kindyncomputations.KinDynComputations,
               controlled_joints_indexes: List,
+              storage_path: str,
               training_path: str,
               local_foot_vertices_pos: List,
               feet_frames: Dict,
@@ -1449,7 +1525,7 @@ class TrajectoryGenerator:
 
         # Build the storage handler component
         generation_to_control_time_scaling = int(generation_rate / control_rate)
-        storage = StorageHandler.build(feet_frames=feet_frames,
+        storage = StorageHandler.build(storage_path=storage_path, feet_frames=feet_frames,
                                        initial_l_foot_position=initial_l_foot_position,
                                        initial_r_foot_position=initial_r_foot_position,
                                        time_scaling=time_scaling,
@@ -1695,6 +1771,34 @@ class TrajectoryGenerator:
                                               joints_vel=joint_vel_postural,
                                               com_pos=com_pos_postural, com_vel=com_vel_postural,
                                               centroidal_momentum=centroidal_momentum_postural)
+
+    def update_storages_and_save(self, blending_coefficients: List, base_postural: List, joints_pos_postural: List,
+                                 joint_vel_postural: List, com_pos_postural: List,
+                                 com_vel_postural: List, centroidal_momentum_postural: List, raw_data: List,
+                                 base_velocities: List, save_every_N_iterations: int) -> None:
+        """Update the blending coefficients, posturals and joystick input storages and periodically save data."""
+
+        # Update the posturals storage
+        self.storage.update_posturals_storage(base=base_postural, joints_pos=joints_pos_postural,
+                                              joints_vel=joint_vel_postural,
+                                              com_pos=com_pos_postural, com_vel=com_vel_postural,
+                                              centroidal_momentum=centroidal_momentum_postural)
+
+        # Update joystick inputs storage
+        self.storage.update_joystick_inputs_storage(raw_data=raw_data, base_velocities=base_velocities)
+
+        # Periodically save data
+        if self.iteration % save_every_N_iterations == 0:
+
+            # Before saving data, update the footsteps list
+            final_deactivation_time = self.iteration * self.generation_rate
+            updated_footsteps = self.kincomputations.footsteps_extractor.update_footsteps(
+                final_deactivation_time=final_deactivation_time, footsteps=self.storage.footsteps)
+            self.storage.replace_footsteps_storage(footsteps=updated_footsteps)
+
+            # Save data
+            self.storage.save_data_as_json()
+
 
     def update_iteration_counter(self) -> None:
         """Update the counter for the iterations of the generator."""

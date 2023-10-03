@@ -28,17 +28,23 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--training_path", help="Path where the training-related data are stored. Relative path from script folder.",
-                    type = str, default = "../datasets/training_subsampled_mirrored_D2_D3_20230320-190551/")
+                    type = str, default = "../datasets/training_subsampled_mirrored_D2_D3_20230910-130015_paper_experiments/")
+
+parser.add_argument("--storage_path", help="Path where the generated trajectory will be stored. Relative path from script folder.",
+                    type=str, default="../datasets/inference/")
+parser.add_argument("--save_every_N_iterations", help="Data will be saved every N iterations.",
+                    type=int, default=1000)
 parser.add_argument("--stream_every_N_steps", help="Data will be streamed every N steps.",
-                    type=int, default=3)
+                    type=int, default=10000)
 parser.add_argument("--stream_every_N_iterations", help="If no steps are performed, data will be streamed every N iterations.",
-                    type=int, default=150) # TODO: tune
+                    type=int, default=10000)
 parser.add_argument("--plot_footsteps", help="Visualize the footsteps.", action="store_true")
 parser.add_argument("--time_scaling", help="Time scaling to be applied to the generated trajectory. Keep it integer.",
                     type=int, default=1)
 
 args = parser.parse_args()
-
+storage_path = args.storage_path
+save_every_N_iterations = args.save_every_N_iterations
 training_path = args.training_path
 stream_every_N_iterations = args.stream_every_N_iterations
 stream_every_N_steps = args.stream_every_N_steps
@@ -152,6 +158,7 @@ generator = trajectory_generator.TrajectoryGenerator.build(icub=icub, gazebo=gaz
                                                            local_foot_vertices_pos=local_foot_vertices_pos,
                                                            feet_frames=feet_frames,
                                                            feet_links=feet_links,
+                                                           storage_path=os.path.join(script_directory, storage_path),
                                                            initial_nn_X=initial_nn_X,
                                                            initial_past_trajectory_base_pos=initial_past_trajectory_base_pos,
                                                            initial_past_trajectory_facing_dirs=initial_past_trajectory_facing_dirs,
@@ -253,13 +260,17 @@ while True:
                                               facing_dirs=facing_dirs,
                                               base_velocities=base_velocities)
 
-    # Update postural storage
-    generator.update_storages(base_postural=new_base_postural,
-                              joints_pos_postural=new_joints_pos_postural,
-                              joint_vel_postural=new_joints_vel_postural,
-                              com_pos_postural=new_com_pos_postural,
-                              com_vel_postural=new_com_vel_postural,
-                              centroidal_momentum_postural=new_centroidal_momentum_postural)
+    # Update storage and periodically save data
+    generator.update_storages_and_save(blending_coefficients=[1,1,1,1], # TODO: temporary fix to handle blending coefficients
+                                        base_postural=new_base_postural,
+                                        joints_pos_postural=new_joints_pos_postural,
+                                        joint_vel_postural=new_joints_vel_postural,
+                                        com_pos_postural=new_com_pos_postural,
+                                        com_vel_postural=new_com_vel_postural,
+                                        centroidal_momentum_postural=new_centroidal_momentum_postural,
+                                        raw_data=raw_data,
+                                        base_velocities=base_velocities,
+                                        save_every_N_iterations=save_every_N_iterations)
 
     # Slow down visualization
     time.sleep(0.001)
