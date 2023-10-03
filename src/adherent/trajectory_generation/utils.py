@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia
 # SPDX-License-Identifier: BSD-3-Clause
 
+import time
 import math
 import json
 import numpy as np
@@ -507,3 +508,220 @@ def define_initial_feet_positions(robot: str) -> (List, List):
         raise Exception("Initial feet position only defined for ergoCubV1.")
 
     return l_foot_position, r_foot_position
+
+# ===================
+# VISUALIZATION UTILS
+# ===================
+
+from PIL import ImageColor
+from matplotlib.patches import Polygon
+
+def to_rgb(color, alpha=1.0):
+    c = [v / 255.0 for v in ImageColor.getcolor(color, "RGB")]
+    c.append(alpha)
+    return c
+
+def plot_rotated_rectangle(width, height, origin, quaternion, color, linewidth, label=None):
+
+    from matplotlib.patches import Polygon
+    from scipy.spatial.transform import Rotation
+
+    # Extract quaternion components
+    w, x, y, z = quaternion
+
+    # Compute rotation matrix from the quaternion (w, x, y, z) to (x, y, z, w) convention
+    rotation_matrix = np.array([
+        [1 - 2 * y ** 2 - 2 * z ** 2, 2 * x * y - 2 * z * w],
+        [2 * x * y + 2 * z * w, 1 - 2 * x ** 2 - 2 * z ** 2]
+    ])
+
+    # Define the vertices of the rectangle centered at the specified origin
+    half_width = width / 2
+    half_height = height / 2
+    vertices = np.array([[-half_width, -half_height],
+                         [half_width, -half_height],
+                         [half_width, half_height],
+                         [-half_width, half_height]])
+
+
+    # Rotate the vertices using the rotation matrix
+    rotated_vertices = np.dot(vertices, rotation_matrix.T)
+
+    # Translate the vertices to the specified origin
+    translated_vertices = rotated_vertices + np.array(origin)
+
+    # Create a new Rectangle object with the correct coordinates
+    if label is None:
+        rectangle = Polygon(translated_vertices, fill=True, color=color, alpha=0.7, edgecolor=color, linewidth=linewidth)
+    else:
+        rectangle = Polygon(translated_vertices, fill=True, color=color, alpha=0.7, edgecolor=color, label=label, linewidth=linewidth)
+
+    return rectangle
+
+
+def visualize_generated_motion(icub: iCub,
+                               controlled_joints_indexes: List,
+                               gazebo: scenario.GazeboSimulator,
+                               l_footsteps: Dict,
+                               r_footsteps: Dict,
+                               posturals: Dict,
+                               raw_data: List,
+                               blending_coeffs: Dict,
+                               plot_blending_coeffs: bool = False,
+                               plot_joystick_inputs: bool = False,
+                               plot_com: bool = False,
+                               plot_momentum: bool = False) -> None:
+    """Visualize the generated motion, optionally along with the joystick inputs used to generate it, the activations
+    of the blending coefficients, the com and the momentum evolution during the trajectory generation."""
+
+    # Extract posturals
+    joint_pos_posturals = posturals["joints_pos"]
+    joint_vel_posturals = posturals["joints_vel"]
+    base_posturals = posturals["base"]
+    com_pos_posturals = posturals["com_pos"]
+    com_vel_posturals = posturals["com_vel"]
+    centroidal_momentum_posturals = posturals["centroidal_momentum"]
+
+    # Define controlled joints
+    icub_joints = icub.joint_names()
+
+    # Config before any plot
+    import matplotlib as mpl
+    mpl.use('Qt5Agg')
+    mpl.rcParams['toolbar'] = 'None'
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({'font.size': 25})
+
+    print("Matplotlib backend:", mpl.get_backend())
+
+    # Plot configuration
+    plt.ion()
+
+    for frame_idx in range(len(joint_pos_posturals)):
+
+        # Debug
+        print(frame_idx, "/", len(joint_pos_posturals))
+
+        # Plot configuration
+        xticks = [i for i in range(0, frame_idx, 300)]
+        xtick_labels = [str(i / 300) for i in range(0, frame_idx, 300)]
+
+        # ======================
+        # VISUALIZE ROBOT MOTION
+        # ======================
+
+        # Retrieve the current joint positions
+        joint_postural = joint_pos_posturals[frame_idx]
+
+        full_joint_positions = np.zeros(len(icub_joints))
+        for index in controlled_joints_indexes:
+            full_joint_positions[index] = joint_postural[icub_joints[index]]
+
+        # Retrieve the current base position and orientation
+        base_postural = base_posturals[frame_idx]
+        base_position = base_postural['position']
+        base_quaternion = base_postural['wxyz_quaternions']
+
+        # Reset the robot configuration in the simulator
+        icub.to_gazebo().reset_base_pose(base_position, base_quaternion)
+        icub.to_gazebo().reset_joint_positions(full_joint_positions, icub_joints)
+        gazebo.run(paused=True)
+
+        # =====================================
+        # PLOT THE MOTION DIRECTION ON FIGURE 1
+        # =====================================
+
+        if plot_joystick_inputs:
+
+            # Retrieve the current motion direction
+            curr_raw_data = raw_data[frame_idx]
+            curr_x = curr_raw_data[0]
+            curr_y = curr_raw_data[1]
+
+            plt.figure(1, figsize=(8, 8))
+            plt.clf()
+
+            # Circumference of unitary radius
+            r = 1
+            x = np.linspace(-r, r, 1000)
+            y = np.sqrt(-x ** 2 + r ** 2)
+            plt.plot(x, y, 'r', linewidth=5.0)
+            plt.plot(x, -y, 'r', linewidth=5.0)
+
+            # Motion direction
+            plt.scatter(0, 0, c='r')
+            desired_motion_direction = plt.arrow(0, 0, curr_x, -curr_y, length_includes_head=True, width=0.02,
+                                                 head_width=8 * 0.01, head_length=1.8 * 8 * 0.01, color='r')
+
+            # Plot configuration
+            plt.axis('scaled')
+            plt.xlim([-1.2, 1.2])
+            plt.ylim([-1.4, 1.2])
+            plt.axis('off')
+            plt.legend([desired_motion_direction], ['User input'], loc="lower center")
+
+        # ==========================
+        # PLOT COM POS AND FOOTSTEPS
+        # ==========================
+
+        if plot_com:
+
+            color_left_nominal = [0.4660, 0.6740, 0.1880, 0.8]
+            color_left_nominal = to_rgb("#b2e061", 0.9)
+            color_right_nominal = color_left_nominal
+            color_com_nominal = to_rgb("#9b19f5")
+
+            # Retrieve the com pos posturals up to the current time
+            com_pos_postural = com_pos_posturals[:frame_idx]
+            com_pos_postural_x = [elem[1] for elem in com_pos_postural]
+            com_pos_postural_y = [-elem[0] for elem in com_pos_postural]
+
+            plt.figure(4, figsize=(16, 24))
+            plt.clf()
+
+            plt.plot(com_pos_postural_x, com_pos_postural_y, label='CoM nominal', color=color_com_nominal, linewidth=5.0)
+
+            for element in l_footsteps:
+                if element["activation_time"] < frame_idx / 100.0:
+                    ground_l_footstep_x = element["pos"][1]
+                    ground_l_footstep_y = -element["pos"][0]
+                    l_quat = element["quat"]
+
+                    if element["activation_time"] == 0:
+                        rectangle = plot_rotated_rectangle(0.06,0.16, (ground_l_footstep_x, ground_l_footstep_y), l_quat, color=color_left_nominal, label='footsteps nominal', linewidth=5.0)
+                    else:
+                        rectangle = plot_rotated_rectangle(0.06, 0.16, (ground_l_footstep_x, ground_l_footstep_y), l_quat, color=color_left_nominal, linewidth=5.0)
+                    plt.gca().add_patch(rectangle)
+
+            for element in r_footsteps:
+                if element["activation_time"] < frame_idx / 100.0:
+                    ground_r_footstep_x = element["pos"][1]
+                    ground_r_footstep_y = -element["pos"][0]
+                    r_quat = element["quat"]
+
+                    if element["activation_time"] == 0:
+                        rectangle = plot_rotated_rectangle(0.06,0.16, (ground_r_footstep_x, ground_r_footstep_y), r_quat, color=color_right_nominal, label=None, linewidth=5.0)
+                    else:
+                        rectangle = plot_rotated_rectangle(0.06, 0.16, (ground_r_footstep_x, ground_r_footstep_y), r_quat, color=color_right_nominal, linewidth=5.0)
+                    plt.gca().add_patch(rectangle)
+
+            # Plot configuration
+            plt.axis('scaled')
+            plt.xlim(-0.8,1.05)
+            plt.ylim(-1.75,0.2)
+            plt.ylabel("y (m)")
+            plt.xlabel("x (m)")
+            plt.legend(loc='lower center', ncol=3)
+
+        if plot_joystick_inputs or plot_com:
+            plt.show()
+            plt.pause(0.001)
+        else:
+            # Show robot motion in real time
+            time.sleep(0.01)
+
+        if frame_idx == 1:
+            input("Start video")
+
+    input("Press Enter to end the visualization of the generated trajectory.")
+

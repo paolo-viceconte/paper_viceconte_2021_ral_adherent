@@ -100,41 +100,13 @@ controlled_joints = ['l_hip_pitch', 'l_hip_roll', 'l_hip_yaw', 'l_knee', 'l_ankl
                      'r_hip_pitch', 'r_hip_roll', 'r_hip_yaw', 'r_knee', 'r_ankle_pitch', 'r_ankle_roll',  # right leg
                      'torso_pitch', 'torso_roll', 'torso_yaw',  # torso
                      'neck_pitch', 'neck_roll', 'neck_yaw', # neck
-                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', 'l_wrist_yaw', 'l_wrist_roll', 'l_wrist_pitch', # left arm
-                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow', 'r_wrist_yaw', 'r_wrist_roll', 'r_wrist_pitch'] # right arm
+                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', # left arm
+                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow'] # right arm
 controlled_joints_indexes = [icub_joints.index(elem) for elem in controlled_joints]
 
 # Show the GUI
 gazebo.gui()
 gazebo.run(paused=True)
-
-# ===================
-# VISUALIZE FOOTSTEPS
-# ===================
-
-# Retrieve left and right footsteps
-ground_l_footsteps = []
-for element in l_footsteps:
-    ground_l_footsteps.append(element["2D_pos"])
-ground_r_footsteps = []
-for element in r_footsteps:
-    ground_r_footsteps.append(element["2D_pos"])
-
-# Insert a blue sphere for each left contact
-blue = (0, 0, 1, 1)
-for ground_l_footstep in ground_l_footsteps:
-    sphere_position = [ground_l_footstep[0], ground_l_footstep[1], 0.0]
-    sphere = Shape(world=world,
-                   model_string=SphereURDF(radius=0.025, color=blue).urdf(),
-                   position=sphere_position)
-
-# Insert a red sphere for each right contact
-red = (1, 0, 0, 1)
-for ground_r_footstep in ground_r_footsteps:
-    sphere_position = [ground_r_footstep[0], ground_r_footstep[1], 0.0]
-    sphere = Shape(world=world,
-                   model_string=SphereURDF(radius=0.025, color=red).urdf(),
-                   position=sphere_position)
 
 # ==========================
 # VISUALIZE GENERATED MOTION
@@ -143,6 +115,8 @@ for ground_r_footstep in ground_r_footsteps:
 input("Press Enter to start the visualization of the generated trajectory.")
 visualize_generated_motion(icub=icub, controlled_joints_indexes=controlled_joints_indexes,
                            gazebo=gazebo, posturals=posturals,
+                           l_footsteps=l_footsteps,
+                           r_footsteps=r_footsteps,
                            raw_data=raw_data, blending_coeffs=blending_coeffs,
                            plot_blending_coeffs=plot_blending_coeffs,
                            plot_joystick_inputs=plot_joystick_inputs,
