@@ -93,8 +93,8 @@ controlled_joints = ['l_hip_pitch', 'l_hip_roll', 'l_hip_yaw', 'l_knee', 'l_ankl
                      'r_hip_pitch', 'r_hip_roll', 'r_hip_yaw', 'r_knee', 'r_ankle_pitch', 'r_ankle_roll',  # right leg
                      'torso_pitch', 'torso_roll', 'torso_yaw',  # torso
                      'neck_pitch', 'neck_roll', 'neck_yaw', # neck
-                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', 'l_wrist_yaw', 'l_wrist_roll', 'l_wrist_pitch', # left arm
-                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow', 'r_wrist_yaw', 'r_wrist_roll', 'r_wrist_pitch'] # right arm
+                     'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', # left arm
+                     'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow'] # right arm
 controlled_joints_indexes = [icub_joints.index(elem) for elem in controlled_joints]
 # controlled_joints_retrieved = [icub_joints[index] for index in controlled_joints_indexes] # This is how to use the indexes
 
@@ -212,6 +212,12 @@ while True:
     joint_positions, joint_velocities, new_base_quaternion = \
         generator.apply_joint_positions_and_base_orientation(denormalized_current_output=denormalized_current_output,
                                                              base_pitch_offset=base_pitch_offset)
+
+    # Temporary debugging to print the initial joint configuration
+    # for i in range(len(joint_positions)):
+    #     joint_positions[i] = joint_positions[i] * 180 / 3.14
+    # print(*joint_positions, sep=",")
+    # input()
 
     # Update the support foot and vertex while detecting new footsteps
     support_foot, update_footsteps_list = generator.update_support_vertex_and_support_foot_and_footsteps()

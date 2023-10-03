@@ -782,6 +782,8 @@ class KinematicComputations:
             # Update also the vertex offset
             self.support_vertex_offset = [self.support_vertex_pos[0], self.support_vertex_pos[1], 0]
 
+            print("NEW VERTEX OFFSET:", self.support_vertex_offset)
+
             # Update support vertex prev
             self.support_vertex_prev = self.support_vertex
 
@@ -1001,6 +1003,11 @@ class Autoregression:
         datapath = os.path.join(training_path, "normalization/")
         Xmean_dict, Xstd_dict = load_component_wise_input_mean_and_std(datapath)
 
+        # Debug to retrieve initial nn X
+        # print("initial_nn_X:")
+        # print(initial_nn_X)
+        # input()
+
         return Autoregression(Xmean_dict=Xmean_dict,
                               Xstd_dict=Xstd_dict,
                               frontal_base_direction=frontal_base_direction,
@@ -1208,9 +1215,8 @@ class Autoregression:
             # Store updated element
             new_past_trajectory_base_velocities.append(new_facing_elem)
 
-        # Add as last element the current (local) base velocity (this is an approximation)
-        new_past_trajectory_base_velocities.append(self.new_facing_R_world.dot(rotation_2D(self.new_base_yaw).dot(
-            [denormalized_current_output[100], denormalized_current_output[101]])))
+        # Add as last element zero base velocity (this is an approximation)
+        new_past_trajectory_base_velocities.append(np.array([0., 0.]))
 
         # Update past base velocities
         self.new_past_trajectory_base_velocities = new_past_trajectory_base_velocities
@@ -1235,7 +1241,7 @@ class Autoregression:
 
         # Extract future base velocities for blending (i.e. in the plot reference frame)
         future_base_vel_plot = denormalized_current_output[24:36]
-        future_base_vel_blend = [[0.0, self.base_vel_norm]] # This is an approximation.
+        future_base_vel_blend = [[0.0, 0.0]] # This is an approximation
         for k in range(0, len(future_base_vel_plot), 2):
             future_base_vel_blend.append([-future_base_vel_plot[k + 1], future_base_vel_plot[k]])
 
@@ -1260,34 +1266,15 @@ class Autoregression:
 
         return next_nn_X, blended_base_velocities
 
-    def autoregressive_usage_future_traj_len(self, next_nn_X: List, future_base_pos_blend_features: List) -> List:
-        """Use the future length trajectory in an autoregressive fashion."""
-
-        # Compute the desired future trajectory length by summing the distances between future base positions
-        future_traj_length = 0
-        future_base_position_prev = future_base_pos_blend_features[0]
-        for future_base_position in future_base_pos_blend_features[1:]:
-            base_position_distance = np.linalg.norm(future_base_position - future_base_position_prev)
-            future_traj_length += base_position_distance
-            future_base_position_prev = future_base_position
-
-        # Normalize the desired future trajectory length
-        future_traj_length = future_traj_length - self.Xmean_dict["future_traj_length"] / self.Xstd_dict["future_traj_length"]
-
-        # Add the desired future trajectory length to the next input
-        next_nn_X.extend([future_traj_length])
-
-        return next_nn_X
-
     def autoregressive_usage_joint_positions_and_velocities(self, next_nn_X: List, current_output: np.array) -> List:
         """Use the joint positions and velocities in an autoregressive fashion."""
 
         # Add the (already normalized) joint positions to the next input
-        s = current_output[0][36:68]
+        s = current_output[0][36:62]
         next_nn_X.extend(s)
 
         # Add the (already normalized) joint velocities to the next input
-        s_dot = current_output[0][68:100]
+        s_dot = current_output[0][62:88]
         next_nn_X.extend(s_dot)
 
         return next_nn_X
@@ -1301,6 +1288,7 @@ class Autoregression:
         # The robot is considered to be stopped if the difference in norm is lower than a threshold
         if nn_X_difference_norm < self.nn_X_difference_norm_threshold:
             self.stopped = True
+            print("STOPPED")
         else:
             self.stopped = False
 
@@ -1345,10 +1333,6 @@ class Autoregression:
             self.autoregressive_usage_base_velocities(next_nn_X=next_nn_X,
                                                       denormalized_current_output=denormalized_current_output,
                                                       base_velocities=base_velocities)
-
-        # Use the future trajectory length in an autoregressive fashion
-        next_nn_X = self.autoregressive_usage_future_traj_len(next_nn_X=next_nn_X,
-                                                              future_base_pos_blend_features=future_base_pos_blend_features)
 
         # Use the joint positions and velocities in an autoregressive fashion
         next_nn_X = self.autoregressive_usage_joint_positions_and_velocities(next_nn_X, current_output)
@@ -1515,16 +1499,16 @@ class TrajectoryGenerator:
         """Apply joint positions and base orientation from the output returned by the network."""
 
         # Extract the new joint positions from the denormalized network output
-        joint_positions = np.asarray(denormalized_current_output[36:68])
+        joint_positions = np.asarray(denormalized_current_output[36:62])
 
         # Extract the joint velocities from the denormalized network output
-        joint_velocities = np.asarray(denormalized_current_output[68:100])
+        joint_velocities = np.asarray(denormalized_current_output[62:88])
 
         # If the robot is stopped, handle unnatural in-place rotations by imposing zero angular base velocity
         if self.autoregression.stopped:
             omega = 0
         else:
-            omega = denormalized_current_output[102]
+            omega = denormalized_current_output[90]
 
         # Extract the new base orientation from the output
         base_yaw_dot = omega * self.generation_rate
