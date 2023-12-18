@@ -15,6 +15,6 @@ input_variables=("/home/iiticublap185/git/adherent_ergocub/datasets/mocap/D2/1_f
 # Loop through the input variables and run Python scripts
 for var in "${input_variables[@]}"; do
     echo "Running Python script with input: $var"
-    python3 retargeting.py --KFWBGR --filename "$var" --save --deactivate_visualization # --smaller_forward_steps
-    python3 retargeting.py --KFWBGR --mirroring --filename "$var" --save --deactivate_visualization # --smaller_forward_steps
+    python3 retargeting.py --KFWBGR --filename "$var" --save --deactivate_visualization
+    python3 retargeting.py --KFWBGR --mirroring --filename "$var" --save --deactivate_visualization
 done
