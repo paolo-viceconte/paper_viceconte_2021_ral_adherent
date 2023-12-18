@@ -231,13 +231,6 @@ class IKTargets:
             updated_quaternions_right = Quaternion.to_wxyz(updated_rotation_right.as_quat())
             updated_orientations_right.append(updated_quaternions_right)
 
-        # Temporary for debugging
-        # import matplotlib.pyplot as plt
-        # plt.plot(range(len(roll_difference)),roll_difference)
-        # plt.plot(range(len(updated_orientations_left)),updated_orientations_left)
-        # plt.plot(range(len(updated_orientations_right)),updated_orientations_right)
-        # plt.show()
-
         # Store updated targets
         self.link_orientation_targets["LeftUpperLeg"] = np.array(updated_orientations_left)
         self.link_orientation_targets["RightUpperLeg"] = np.array(updated_orientations_right)
@@ -249,6 +242,7 @@ class WBGR:
     ik_targets: IKTargets
     ik: InverseKinematicsNLP
     robot_to_target_base_quat: List
+    shoulder_roll_lower_limit: float
 
     @staticmethod
     def build(motiondata: motion_data.MotionData,
@@ -258,7 +252,8 @@ class WBGR:
               horizontal_feet: bool = False,
               straight_head: bool = False,
               wider_legs: bool = False,
-              robot_to_target_base_quat: List = None) -> "WBGR":
+              robot_to_target_base_quat: List = None,
+              shoulder_roll_lower_limit: float = 0.0) -> "WBGR":
         """Build an instance of WBGR."""
 
         # Instantiate IKTargets
@@ -280,7 +275,8 @@ class WBGR:
             # Enforce wider legs
             ik_targets.enforce_wider_legs()
 
-        return WBGR(ik_targets=ik_targets, ik=ik, robot_to_target_base_quat=robot_to_target_base_quat)
+        return WBGR(ik_targets=ik_targets, ik=ik, robot_to_target_base_quat=robot_to_target_base_quat,
+                    shoulder_roll_lower_limit=shoulder_roll_lower_limit)
 
     def retarget(self) -> (List, List):
         """Apply Whole-Body Geometric Retargeting (WBGR)."""
@@ -354,16 +350,13 @@ class WBGR:
             # IMPOSE LIMITS FOR THE SHOULDER ROLLS
             # ====================================
 
-            # Define shoulder roll lower limit # TODO: move in the utils since this is robot-dependent
-            shoulder_roll_lower_limit = 0.1
-
             # Impose left shoulder roll lower limit
-            if ik_solution.joint_configuration[self.ik._joint_serialization.index('l_shoulder_roll')] < shoulder_roll_lower_limit:
-                ik_solution.joint_configuration[self.ik._joint_serialization.index('l_shoulder_roll')] = shoulder_roll_lower_limit
+            if ik_solution.joint_configuration[self.ik._joint_serialization.index('l_shoulder_roll')] < self.shoulder_roll_lower_limit:
+                ik_solution.joint_configuration[self.ik._joint_serialization.index('l_shoulder_roll')] = self.shoulder_roll_lower_limit
 
             # Impose right shoulder roll lower limit
-            if ik_solution.joint_configuration[self.ik._joint_serialization.index('r_shoulder_roll')] < shoulder_roll_lower_limit:
-                ik_solution.joint_configuration[self.ik._joint_serialization.index('r_shoulder_roll')] = shoulder_roll_lower_limit
+            if ik_solution.joint_configuration[self.ik._joint_serialization.index('r_shoulder_roll')] < self.shoulder_roll_lower_limit:
+                ik_solution.joint_configuration[self.ik._joint_serialization.index('r_shoulder_roll')] = self.shoulder_roll_lower_limit
 
             # Store the ik solutions
             ik_solutions.append(ik_solution)
@@ -520,6 +513,7 @@ class KFWBGR(WBGR):
               straight_head: bool = False,
               wider_legs: bool = False,
               robot_to_target_base_quat: List = None,
+              shoulder_roll_lower_limit: float = 0.0,
               kindyn: kindyncomputations.KinDynComputations = None,
               local_foot_vertices_pos: List = None,
               feet_frames: Dict = None) -> "KFWBGR":
@@ -548,7 +542,7 @@ class KFWBGR(WBGR):
             kindyn=kindyn, local_foot_vertices_pos=local_foot_vertices_pos, feet_frames=feet_frames)
 
         return KFWBGR(ik_targets=ik_targets, ik=ik, robot_to_target_base_quat=robot_to_target_base_quat,
-                      kinematic_computations=kinematic_computations)
+                      kinematic_computations=kinematic_computations, shoulder_roll_lower_limit=shoulder_roll_lower_limit)
 
     def KF_retarget(self) -> (List, List):
         """Apply Kinematically-Feasible Whole-Body Geometric Retargeting (KFWBGR)."""

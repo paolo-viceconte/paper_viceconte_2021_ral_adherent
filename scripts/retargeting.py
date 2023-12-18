@@ -147,6 +147,9 @@ local_foot_vertices_pos = utils.define_foot_vertices(robot="ergoCubV1")
 # Define robot-specific quaternions from the robot base frame to the target base frame
 robot_to_target_base_quat = utils.define_robot_to_target_base_quat(robot="ergoCubV1")
 
+# Define robot-specific shoulder roll limit imposed to avoid self-collisions between body and arms
+shoulder_roll_lower_limit = utils.define_shoulder_roll_lower_limit(robot="ergoCubV1")
+
 # Instantiate the retargeter
 if kinematically_feasible_base_retargeting:
     retargeter = motion_data_retargeter.KFWBGR.build(motiondata=motiondata,
@@ -157,6 +160,7 @@ if kinematically_feasible_base_retargeting:
                                                      straight_head=straight_head,
                                                      wider_legs=wider_legs,
                                                      robot_to_target_base_quat=robot_to_target_base_quat,
+                                                     shoulder_roll_lower_limit = shoulder_roll_lower_limit,
                                                      kindyn=kindyn,
                                                      local_foot_vertices_pos=local_foot_vertices_pos,
                                                      feet_frames=feet_frames)
@@ -168,7 +172,8 @@ else:
                                                    horizontal_feet=horizontal_feet,
                                                    straight_head=straight_head,
                                                    wider_legs=wider_legs,
-                                                   robot_to_target_base_quat=robot_to_target_base_quat)
+                                                   robot_to_target_base_quat=robot_to_target_base_quat,
+                                                   shoulder_roll_lower_limit = shoulder_roll_lower_limit)
 
 # Retrieve ik solutions
 if kinematically_feasible_base_retargeting:

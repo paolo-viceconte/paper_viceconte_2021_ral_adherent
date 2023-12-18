@@ -99,6 +99,17 @@ def define_foot_vertices(robot: str) -> List:
 
     return F_vertices_pos
 
+def define_shoulder_roll_lower_limit(robot: str) -> List:
+    """Define the robot-specific shoulder roll limit imposed during retargeting to avoid self-collisions."""
+
+    if robot == "ergoCubV1":
+        shoulder_roll_lower_limit = 0.1
+
+    else:
+        raise Exception("Shoulder roll limit only defined for ergoCubV1.")
+
+    return shoulder_roll_lower_limit
+
 def quaternion_multiply(quat1: List, quat2: List) -> np.array:
     """Auxiliary function for quaternion multiplication."""
 
