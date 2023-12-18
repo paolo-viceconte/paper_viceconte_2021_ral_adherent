@@ -446,22 +446,28 @@ class FeaturesExtractor:
         print("X_full size before replicating stops:", len(X_full), "x", len(X_full[0]))
         print("X_skipped size before replicating stops:", len(X_skipped), "x", len(X_skipped[0]))
 
-        # For each stop frame to be replicated
+        # Replicate stop frames
         for _ in range(replicate_stop_frames):
 
             for stop_interval in stop_frames:
 
+                # Define the initial and final frame for the stop motion
                 stop_start = stop_interval[0] - initial_frame
                 stop_end = stop_interval[1] - initial_frame
 
-                for i in range(round(stop_start/2) - 75, round(stop_end/2) - 25): # TODO hardcoded
+                # Define the initial and final frame for the motion to be actually replicated
+                # to include only the transition towards stopping and not the opposite one
+                replicate_start = round(stop_start/2) - round(1.5 * self.local_window_features.window_length_frames)
+                replicate_stop = round(stop_end/2) - round(0.5 * self.local_window_features.window_length_frames)
+
+                for i in range(replicate_start, replicate_stop):
 
                     # Replicate current input vector (124 components)
                     X_skipped.append(X_full[i])
 
         # Debug
         print("X_full size after replicating stops:", len(X_full), "x", len(X_full[0]))
-        print("X size after replicating steps:", len(X_skipped), "x", len(X_skipped[0]))
+        print("X size after replicating stops:", len(X_skipped), "x", len(X_skipped[0]))
 
         return X_skipped
 
@@ -514,12 +520,12 @@ class FeaturesExtractor:
             current_s_dot = self.global_frame_features.s_dot[i - 1]
             Y_i.extend(current_s_dot)
 
-            # TODO: remove unused value
+            # TODO: this is actually not used and could be removed
             # Add current local base x linear velocity component (1 component)
             current_local_base_x_velocity = [self.local_frame_features.base_x_velocities[i - 1]]
             Y_i.extend(current_local_base_x_velocity)
 
-            # TODO: remove unused value
+            # TODO: this is actually not used and could be removed
             # Add current local base y linear velocity component (1 component)
             current_local_base_z_velocity = [self.local_frame_features.base_z_velocities[i - 1]]
             Y_i.extend(current_local_base_z_velocity)
@@ -545,15 +551,21 @@ class FeaturesExtractor:
         print("Y_full size before replicating stops:", len(Y_full), "x", len(Y_full[0]))
         print("Y_skipped size before replicating stops:", len(Y_skipped), "x", len(Y_skipped[0]))
 
-        # For each stop frame to be replicated
+        # Replicate stop frames
         for _ in range(replicate_stop_frames):
 
             for stop_interval in stop_frames:
 
+                # Define the initial and final frame for the stop motion
                 stop_start = stop_interval[0] - initial_frame
                 stop_end = stop_interval[1] - initial_frame
 
-                for i in range(round(stop_start/2) - 75, round(stop_end/2) - 25): # TODO hardcoded
+                # Define the initial and final frame for the motion to be actually replicated
+                # to include only the transition towards stopping and not the opposite one
+                replicate_start = round(stop_start/2) - round(1.5 * self.local_window_features.window_length_frames)
+                replicate_stop = round(stop_end/2) - round(0.5 * self.local_window_features.window_length_frames)
+
+                for i in range(replicate_start, replicate_stop):
 
                     # Replicate current output vector (91 components)
                     Y_skipped.append(Y_full[i])

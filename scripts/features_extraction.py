@@ -39,10 +39,10 @@ parser.add_argument("--plot_local", help="Visualization the computed local featu
 # Store configuration
 parser.add_argument("--save", help="Store the network input and output vectors in json format.",action="store_true")
 
-# How many times replicate stop frames
+# How many times replicate stop frames (if defined)
 parser.add_argument("--replicate_stop_frames", help="How many times you want to replicate the stop frames.", type=int, default=0)
 
-# Skip some frames
+# Skip some frames (if defined)
 parser.add_argument("--skip_annotated_frames", help="Skip the annotated frames.",action="store_true")
 
 args = parser.parse_args()
@@ -60,19 +60,27 @@ skip_annotated_frames = args.skip_annotated_frames
 # LOAD RETARGETED DATA
 # ====================
 
-# Define the selected subsection of the dataset to be loaded and the correspondent interesting frame interval
 if dataset == "D2":
+
+    # Define the selected subsection of the dataset to be loaded and the correspondent interesting frame interval
     retargeted_mocaps = {1:"1_forward_normal_step",2:"2_backward_normal_step",3:"3_left_and_right_normal_step",
                          4:"4_diagonal_normal_step",5:"5_mixed_normal_step"}
     limits = {1: [3750, 35750], 2: [1850, 34500], 3: [2400, 36850], 4: [1550, 16000], 5: [2550, 82250]}
-    stops = {1: [], 2: [], 3: [], 4: [], 5: []} # TODO: not defined for D2
-    skips = {1: [], 2: [], 3: [], 4: [], 5: []}  # TODO: not defined for D2
+
+    # Stop frames not defined for D2
+    stops = {1: [], 2: [], 3: [], 4: [], 5: []}
+
+    # Frames to be skipped not defined for D2
+    skips = {1: [], 2: [], 3: [], 4: [], 5: []}
+
 elif dataset == "D3":
+
+    # Define the selected subsection of the dataset to be loaded and the correspondent interesting frame interval
     retargeted_mocaps = {6:"6_forward_small_step",7:"7_backward_small_step",8:"8_left_and_right_small_step",
                          9:"9_diagonal_small_step",10:"10_mixed_small_step",11:"11_mixed_normal_and_small_step"}
-
     limits = {6: [1500, 28500], 7: [1750, 34000], 8: [2900, 36450], 9: [1250, 17050], 10: [1450, 78420], 11: [1600, 61350]}
 
+    # Stop frames for D3
     stops =  {6: [[3740,3900], [6080,6250], [10000,10150], [13040,13240], [16000,16130]],
               7: [[5280,5420], [8460,8620], [10980,11130], [13660,13820], [16720,16890], [19690,19810], [20240,20400], [20920,21090], [24830,25070], [30430,30560], [31010,31170]],
               8: [[310,530], [1210,1270], [3460,3670], [5700,5770], [7700,7880], [9640,9780], [10960,11050], [14100,14260], [16250,16320], [18000,18120], [20480,20640], [22040,22270], [23880,24070], [26780,26950], [27980,28110], [30080,30200], [33420,33550]],
@@ -80,8 +88,9 @@ elif dataset == "D3":
               10: [[1310,1420], [4410,4610], [8760,8850], [10710,10910], [13050,13160], [13950,14040], [16660,16810], [20800,21010], [23750,23860], [27850,27940], [29800,30070], [32020,32210], [33220,33440], [35270,35370], [37500,37670], [40680,40780], [41620,41760]],
               11: []}
 
-    skips = {6: [], 7: [], 8: [], 9: [], 10: [], # TODO: : not defined for some portions of D3
-             11: [[1120,1570],[2050,2480],[8500,8950],[9450,9570],[9800,10215],[10830,11700],[17040,17440],[20460,20950],[21280,21500],[235540,24300],[27960,30200],[32970,33110],[33690,35040],[37260,37470],[41740,42310],[42940,43360],[45340,45570],[45970,46340],[48810,49830],[51060,51400],[51570,51800],[53730,54660],[57500,58540]], # TODO: defined for D3.11 to skip long sidesteps
+    # Frames to be skipped defined only for portion 11 of D3 (to skip too long sidesteps)
+    skips = {6: [], 7: [], 8: [], 9: [], 10: [],
+             11: [[1120,1570],[2050,2480],[8500,8950],[9450,9570],[9800,10215],[10830,11700],[17040,17440],[20460,20950],[21280,21500],[235540,24300],[27960,30200],[32970,33110],[33690,35040],[37260,37470],[41740,42310],[42940,43360],[45340,45570],[45970,46340],[48810,49830],[51060,51400],[51570,51800],[53730,54660],[57500,58540]],
              }
 
 initial_frame = limits[retargeted_mocap_index][0]
@@ -131,7 +140,6 @@ controlled_joints = ['l_hip_pitch', 'l_hip_roll', 'l_hip_yaw', 'l_knee', 'l_ankl
                      'l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw', 'l_elbow', # left arm
                      'r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw', 'r_elbow'] # right arm
 controlled_joints_indexes = [icub_joints.index(elem) for elem in controlled_joints]
-# controlled_joints_retrieved = [icub_joints[index] for index in controlled_joints_indexes] # This is how to use the indexes
 
 # Show the GUI
 gazebo.gui()
