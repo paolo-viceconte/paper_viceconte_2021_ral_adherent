@@ -117,12 +117,8 @@ ik.initialize(verbosity=1,
               cost_tolerance=1e-4,
               floating_base=True)
 
-# Download: https://github.com/ami-iit/coinhsl-binary-packages/releases/download/v2019.05.21.0/coinhsl-2019.05.21-ubuntu-20.04.deb
-# Run within the docker container:
-# sudo apt update
-# sudo apt install ./coinhsl-2019.05.21-ubuntu-20.04.deb
-# Then you can switch to a faster solver through the following line:
-ik._ik.setLinearSolverName('ma27')
+# If you have the ma27 solver installed (which is faster), decomment the following line to use it
+# ik._ik.setLinearSolverName('ma27')
 
 # Add base pose target as a constraint
 ik.add_target(frame_name="data_Pelvis", target_type=TargetType.POSE, as_constraint=True)
