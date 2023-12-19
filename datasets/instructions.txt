@@ -1,90 +1,17 @@
-##################################################################################
-# TODO: upload data on Hugging Face and update the following block of instructions
-##################################################################################
-
-This folder is intended to contain the dataset available at:
-
-    https://zenodo.org/record/6201915#.YhOT_Bso-8g
-
-Please download the zipped dataset, extract it and replace this folder with the extracted "datasets" folder.
-
-If you do so, your dataset will contain the following content.
+This folder is intended to contain the datasets available at https://huggingface.co/datasets/ami-iit/dnn-mpc-datasets.
 
 
-=======
-SUMMARY
-=======
+In particular, the datasets are organized in the following folders:
 
-The dataset is organized in folders, whose content can be summarized as follows:
 - mocap: motion capture data collected from human motion
-- retargeted_mocap:	motion capture data retargeted on the robot
+
+- retargeted_mocap: motion capture data retargeted on the robot
+
 - IO_features: input and output features extracted from the retargeted mocap data to train the trajectory generator
-- training_subsampled_mirrored_D2_D3_20230910-130015_paper_experiments: training data
+
+- training_mirrored_D2_D3_20230910-130015: training data
 
 
-================
-DETAILED CONTENT
-================
 
--------------------------------------------------------------------------------------------------------------
-mocap
--------------------------------------------------------------------------------------------------------------
+Please download and extract the datasets in this folder in order to use them. 
 
-This folder contains motion capture data collected from human motion.
-
-Two motion capture datasets are inlcuded: D2 and D3.
-
-Each dataset is composed of several portions.
-
-Each portion has a dedicated folder with a "data.log" file containing the correspondent motion capture data
-in a custom wearable format (see https://github.com/robotology/wearables).
-
--------------------------------------------------------------------------------------------------------------
-retargeted_mocap
--------------------------------------------------------------------------------------------------------------
-
-This folder contains the motion capture data retargeted on the robot.
-
-For each portion of each dataset, the correspondent retargeted mocap data are contained in a file named
-"<dataset>/<portion>_RETARGETED.txt".
-
-Another file named "<dataset>_mirrored/<portion>_RETARGETED_MIRRORED.txt" collects the mirrored retargeted
-mocap data associated to each portion of each dataset.
-
-All the retargeted mocap data are stored in json format.
-
-These data can be visualized using the "play_retargeted_mocap.py" script with the proper --dataset, --portion
-and --mirrored arguments.
-
--------------------------------------------------------------------------------------------------------------
-IO_features
--------------------------------------------------------------------------------------------------------------
-
-This folder contains input and output features used to train the trajectory generator.
-
-The input features extracted from each portion of each dataset are stored in a file named
-"inputs_subsampled_<dataset>/<portion>_X.txt".
-
-The output features extracted from each portion of each dataset are stored in a file named
-"outputs_subsampled_<dataset>/<portion>_Y.txt".
-
-The input features extracted from each mirrored portion of each dataset are stored in a file named
-"inputs_subsampled_mirrored_<dataset>/<portion>_X_MIRRORED.txt".
-
-The output features extracted from each mirrored portion of each dataset are stored in a file named
-"outputs_subsampled_mirrored_<dataset>/<portion>_Y_MIRRORED.txt".
-
-All the features are stored in json format.
-
--------------------------------------------------------------------------------------------------------------
-training_subsampled_mirrored_D2_D3_20230910-130015_paper_experiments
--------------------------------------------------------------------------------------------------------------
-
-This folder includes data related to training.
-
-The /models folder includes the tf checkpoint to restore the trained model.
-
-The /normalization folder includes the full training and test input X and output Y along with the input and
-output mean and standard deviation.
-
-The /logs folder includes the tensorboard logs.
