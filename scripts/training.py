@@ -107,9 +107,9 @@ def define_storage_folder(datasets: List, mirroring: bool) -> str:
 
     # Set storage folder
     if not mirroring:
-        storage_folder = script_directory + '/../datasets/training_subsampled'
+        storage_folder = script_directory + '/../datasets/training'
     else:
-        storage_folder = script_directory + '/../datasets/training_subsampled_mirrored'
+        storage_folder = script_directory + '/../datasets/training_mirrored'
     for dataset in datasets:
         storage_folder += "_" + dataset
 
