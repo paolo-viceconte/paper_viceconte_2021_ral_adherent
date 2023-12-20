@@ -137,9 +137,6 @@ testing_data = data_handler.get_testing_data()
 # TRAINING CONFIGURATION
 # ======================
 
-# Debug
-input("\nPress Enter to start the training")
-
 # Random seed
 torch.manual_seed(23456)
 
@@ -179,7 +176,9 @@ for name, param in mann.named_parameters():
 # Check whether the gpu or the cpu is used
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
-input()
+
+# Debug
+input("\nPress Enter to start the training")
 
 # Use unweighted MSE loss
 loss_fn = nn.MSELoss(reduction="mean")
